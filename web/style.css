@@ -3717,7 +3717,7 @@ input, select, textarea {
     text-decoration: underline;
 }
 
-/* Medical ID Card */
+/* Medical Information Card */
 .medical-id-header {
     display: flex;
     align-items: center;
@@ -3734,7 +3734,16 @@ input, select, textarea {
 .medical-id-header h3 {
     font-size: 1.15rem;
     font-weight: 800;
-    color: #0f172a;
+    color: var(--text-heading, #0f2838);
+    transition: color 0.2s ease;
+}
+
+/* Ensure crystal-clear readability in Dark / Night Mode */
+[data-theme="dark"] .medical-id-header h3,
+body.dark-mode .medical-id-header h3,
+[data-theme="dark"] .medical-id-card h3,
+body.dark-mode .medical-id-card h3 {
+    color: #f8fafc !important;
 }
 
 .med-id-group {
@@ -3743,10 +3752,49 @@ input, select, textarea {
 
 .med-id-label {
     display: block;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: #64748b;
+    color: var(--text-muted, #64748b);
     margin-bottom: 6px;
+    transition: color 0.2s ease;
+}
+
+[data-theme="dark"] .med-id-label,
+body.dark-mode .med-id-label {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .btn-edit-medical-data,
+body.dark-mode .btn-edit-medical-data {
+    background: #0f2738 !important;
+    border-color: #1a4f66 !important;
+    color: #38c1d7 !important;
+}
+
+[data-theme="dark"] .btn-edit-medical-data:hover,
+body.dark-mode .btn-edit-medical-data:hover {
+    background: #15384e !important;
+    border-color: #38c1d7 !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] #modal-edit-medical-id .modal-header h3,
+body.dark-mode #modal-edit-medical-id .modal-header h3 {
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] #modal-edit-medical-id label,
+body.dark-mode #modal-edit-medical-id label {
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] #modal-edit-medical-id input,
+body.dark-mode #modal-edit-medical-id input,
+[data-theme="dark"] #modal-edit-medical-id select,
+body.dark-mode #modal-edit-medical-id select {
+    background: #0a1c28 !important;
+    color: #f8fafc !important;
+    border-color: #16364c !important;
 }
 
 .med-id-pills {

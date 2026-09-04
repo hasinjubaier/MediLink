@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.5">
     <!-- Immediate Theme Initialization to Prevent FOUC -->
     <script>
         (function() {
@@ -1348,28 +1348,27 @@
                             <div class="settings-card medical-id-card">
                                 <div class="medical-id-header">
                                     <span class="heart-icon">♡</span>
-                                    <h3>Medical ID</h3>
+                                    <h3>Medical Information</h3>
                                 </div>
 
                                 <div class="med-id-group">
                                     <label class="med-id-label">Blood Type</label>
                                     <div class="med-id-pills">
-                                        <span class="pill-blood-type" id="pill-blood-type">O Negative</span>
+                                        <span class="pill-blood-type" id="pill-blood-type" style="background:#f1f5f9; color:#64748b;">Not specified</span>
                                     </div>
                                 </div>
 
                                 <div class="med-id-group">
                                     <label class="med-id-label">Known Allergies</label>
                                     <div class="med-id-pills" id="allergies-pills-container">
-                                        <span class="pill-allergy">Penicillin</span>
-                                        <span class="pill-allergy">Latex</span>
+                                        <span class="pill-allergy" style="background:#f1f5f9; color:#64748b;">None reported</span>
                                     </div>
                                 </div>
 
                                 <div class="med-id-group">
                                     <label class="med-id-label">Chronic Conditions</label>
                                     <div class="med-id-pills" id="chronic-pills-container">
-                                        <span class="pill-condition">Asthma (Mild)</span>
+                                        <span class="pill-condition" style="background:#f1f5f9; color:#64748b;">None reported</span>
                                     </div>
                                 </div>
 
@@ -1909,7 +1908,7 @@
             <div class="modal-header">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="color:#ef4444; font-size:1.2rem; font-weight:bold;">♡</span>
-                    <h3 style="margin:0;">Edit Medical ID</h3>
+                    <h3 style="margin:0;">Edit Medical Information</h3>
                 </div>
                 <button class="btn-close" onclick="closeModal('modal-edit-medical-id')">&times;</button>
             </div>
@@ -2324,7 +2323,7 @@
     </div>
 
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2.5"></script>
 </body>
 </html>
 

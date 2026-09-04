@@ -706,9 +706,9 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
         emergencyContact: user.emergencyContact || '',
         emergencyContacts: ecList,
         medicalId: user.medicalId || {
-            bloodType: user.bloodType || 'O Negative',
-            allergies: user.allergies !== undefined ? user.allergies : 'Penicillin, Latex',
-            chronicConditions: user.chronicConditions !== undefined ? user.chronicConditions : 'Asthma (Mild)'
+            bloodType: user.bloodType || '',
+            allergies: user.allergies !== undefined ? user.allergies : '',
+            chronicConditions: user.chronicConditions !== undefined ? user.chronicConditions : ''
         }
     };
     state.activeRole = user.role;
@@ -890,44 +890,50 @@ function syncProfileSettingsFields(user) {
     }
 
     // Restore medical ID data if present in session
-    if (user && user.medicalId) {
-        const bloodPill = document.getElementById('pill-blood-type');
-        if (bloodPill && user.medicalId.bloodType) bloodPill.textContent = user.medicalId.bloodType;
-
-        if (user.medicalId.allergies !== undefined) {
-            const allergiesContainer = document.getElementById('allergies-pills-container');
-            if (allergiesContainer) {
-                allergiesContainer.innerHTML = '';
-                const allergies = user.medicalId.allergies ? user.medicalId.allergies.split(',').map(s => s.trim()).filter(Boolean) : [];
-                if (allergies.length === 0) {
-                    allergiesContainer.innerHTML = '<span class="pill-allergy" style="background:#f1f5f9; color:#64748b;">None reported</span>';
-                } else {
-                    allergies.forEach(a => {
-                        const span = document.createElement('span');
-                        span.className = 'pill-allergy';
-                        span.textContent = a;
-                        allergiesContainer.appendChild(span);
-                    });
-                }
-            }
+    const bloodPill = document.getElementById('pill-blood-type');
+    if (bloodPill) {
+        if (user && user.medicalId && user.medicalId.bloodType) {
+            bloodPill.textContent = user.medicalId.bloodType;
+            bloodPill.style.background = '#fee2e2';
+            bloodPill.style.color = '#dc2626';
+        } else {
+            bloodPill.textContent = 'Not specified';
+            bloodPill.style.background = '#f1f5f9';
+            bloodPill.style.color = '#64748b';
         }
+    }
 
-        if (user.medicalId.chronicConditions !== undefined) {
-            const chronicContainer = document.getElementById('chronic-pills-container');
-            if (chronicContainer) {
-                chronicContainer.innerHTML = '';
-                const conditions = user.medicalId.chronicConditions ? user.medicalId.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [];
-                if (conditions.length === 0) {
-                    chronicContainer.innerHTML = '<span class="pill-condition" style="background:#f1f5f9; color:#64748b;">None reported</span>';
-                } else {
-                    conditions.forEach(c => {
-                        const span = document.createElement('span');
-                        span.className = 'pill-condition';
-                        span.textContent = c;
-                        chronicContainer.appendChild(span);
-                    });
-                }
-            }
+    const allergiesContainer = document.getElementById('allergies-pills-container');
+    if (allergiesContainer) {
+        allergiesContainer.innerHTML = '';
+        const rawAllergies = (user && user.medicalId && user.medicalId.allergies) ? user.medicalId.allergies : '';
+        const allergies = rawAllergies ? rawAllergies.split(',').map(s => s.trim()).filter(Boolean) : [];
+        if (allergies.length === 0) {
+            allergiesContainer.innerHTML = '<span class="pill-allergy" style="background:#f1f5f9; color:#64748b;">None reported</span>';
+        } else {
+            allergies.forEach(a => {
+                const span = document.createElement('span');
+                span.className = 'pill-allergy';
+                span.textContent = a;
+                allergiesContainer.appendChild(span);
+            });
+        }
+    }
+
+    const chronicContainer = document.getElementById('chronic-pills-container');
+    if (chronicContainer) {
+        chronicContainer.innerHTML = '';
+        const rawChronic = (user && user.medicalId && user.medicalId.chronicConditions) ? user.medicalId.chronicConditions : '';
+        const conditions = rawChronic ? rawChronic.split(',').map(s => s.trim()).filter(Boolean) : [];
+        if (conditions.length === 0) {
+            chronicContainer.innerHTML = '<span class="pill-condition" style="background:#f1f5f9; color:#64748b;">None reported</span>';
+        } else {
+            conditions.forEach(c => {
+                const span = document.createElement('span');
+                span.className = 'pill-condition';
+                span.textContent = c;
+                chronicContainer.appendChild(span);
+            });
         }
     }
 }
@@ -958,7 +964,7 @@ async function saveProfileSettings() {
     });
 
     const bloodPill = document.getElementById('pill-blood-type');
-    const bloodType = bloodPill ? bloodPill.textContent.trim() : (state.currentUser?.medicalId?.bloodType || 'O Negative');
+    const bloodType = (bloodPill && bloodPill.textContent.trim() !== 'Not specified') ? bloodPill.textContent.trim() : (state.currentUser?.medicalId?.bloodType || '');
     const allergyPills = document.querySelectorAll('#allergies-pills-container .pill-allergy');
     const allergies = Array.from(allergyPills).map(p => p.textContent.trim()).filter(t => t !== 'None reported').join(', ');
     const conditionPills = document.querySelectorAll('#chronic-pills-container .pill-condition');
@@ -1104,7 +1110,7 @@ function handlePatientPhotoUpload(event) {
 
 function openEditMedicalIdModal() {
     // Read current values from the UI
-    const currentBlood = document.getElementById('pill-blood-type') ? document.getElementById('pill-blood-type').textContent.trim() : 'O Positive';
+    const currentBlood = (document.getElementById('pill-blood-type') && document.getElementById('pill-blood-type').textContent.trim() !== 'Not specified') ? document.getElementById('pill-blood-type').textContent.trim() : 'O Positive';
     
     const allergyPills = document.querySelectorAll('#allergies-pills-container .pill-allergy');
     const currentAllergies = Array.from(allergyPills).map(p => p.textContent.trim()).filter(t => t !== 'None reported').join(', ');
@@ -1117,8 +1123,8 @@ function openEditMedicalIdModal() {
     const chronicInput = document.getElementById('edit-med-chronic');
 
     if (bloodSelect) bloodSelect.value = currentBlood;
-    if (allergiesInput) allergiesInput.value = currentAllergies || 'Penicillin, Latex';
-    if (chronicInput) chronicInput.value = currentChronic || 'Asthma (Mild)';
+    if (allergiesInput) allergiesInput.value = currentAllergies;
+    if (chronicInput) chronicInput.value = currentChronic;
 
     openModal('modal-edit-medical-id');
 }
