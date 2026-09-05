@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.5">
+    <link rel="stylesheet" href="style.css?v=3.7">
     <!-- Immediate Theme Initialization to Prevent FOUC -->
     <script>
         (function() {
@@ -48,8 +48,8 @@
                 <nav class="nav-links">
                     <a href="#features" class="nav-link active">Features</a>
                     <a href="#how-it-works" class="nav-link">How It Works</a>
-                    <a href="#for-patients" class="nav-link">For Patients</a>
-                    <a href="#for-pharmacists" class="nav-link">For Pharmacists</a>
+                    <a href="#for-patients" class="nav-link">Patients</a>
+                    <a href="#for-pharmacists" class="nav-link">Pharmacists</a>
                     <a href="#about" class="nav-link">About</a>
                 </nav>
 
@@ -125,7 +125,7 @@
                         </h1>
 
                         <p class="hero-subtext">
-                            MediLink is your smart assistant for prescriptions, medication management, and pharmacist consultations. Experience seamless healthcare coordination with bank-level security and intelligent insights.
+                            MediLink helps you manage prescriptions, check drug interactions, find genuine medicine alternatives, and connect with pharmacists — all in one place, built for real emergencies.
                         </p>
 
                         <div class="hero-cta-group">
@@ -153,39 +153,6 @@
                                 </svg>
                                 <span>Patient Care Focused</span>
                             </div>
-                        </div>
-
-                        <!-- Demo Picture Quick Medicine Search Bar -->
-                        <div class="hero-search-bar-card">
-                            <div class="search-field-group">
-                                <label>Search Medicine</label>
-                                <div class="search-input-box">
-                                    <span>🔍</span>
-                                    <input type="text" placeholder="Search by medicine name..." id="hero-quick-search-input" onkeydown="if(event.key==='Enter') launchApp('dashboard')">
-                                </div>
-                            </div>
-                            <div class="search-divider"></div>
-                            <div class="search-field-group">
-                                <label>Category</label>
-                                <div class="search-input-box">
-                                    <select id="hero-category-select">
-                                        <option value="">All Categories</option>
-                                        <option value="tablets">Tablets</option>
-                                        <option value="capsules">Capsules</option>
-                                        <option value="injectables">Injectables</option>
-                                        <option value="syrups">Dry Syrups</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="search-divider"></div>
-                            <div class="search-field-group">
-                                <label>Find Nearby</label>
-                                <div class="search-input-box">
-                                    <span>📍</span>
-                                    <input type="text" placeholder="Enter location (e.g. Banani)" id="hero-location-input">
-                                </div>
-                            </div>
-                            <button type="button" class="btn-hero-find" onclick="launchApp('dashboard')">Find Now</button>
                         </div>
                     </div>
 
@@ -288,6 +255,59 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Quick Medicine Search Bar Separated into Hero Section, Centered in Screen -->
+                <div class="hero-search-bar-wrapper">
+                    <div class="hero-search-bar-card">
+                        <div class="search-field-group">
+                            <label>Search Medicine</label>
+                            <div class="search-field-textbox search-input-box">
+                                <span class="search-field-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8"/>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                    </svg>
+                                </span>
+                                <input type="text" placeholder="Search medicine..." id="hero-quick-search-input" onkeydown="if(event.key==='Enter') launchApp('dashboard')">
+                            </div>
+                        </div>
+                        <div class="search-divider"></div>
+                        <div class="search-field-group">
+                            <label>Category</label>
+                            <div class="search-field-textbox search-input-box">
+                                <span class="search-field-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="3" width="7" height="7"/>
+                                        <rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="14" y="14" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/>
+                                    </svg>
+                                </span>
+                                <select id="hero-category-select">
+                                    <option value="">All Categories</option>
+                                    <option value="tablets">Tablets</option>
+                                    <option value="capsules">Capsules</option>
+                                    <option value="injectables">Injectables</option>
+                                    <option value="syrups">Dry Syrups</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="search-divider"></div>
+                        <div class="search-field-group">
+                            <label>Find Nearby</label>
+                            <div class="search-field-textbox search-input-box">
+                                <span class="search-field-icon">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                </span>
+                                <input type="text" placeholder="Enter location..." id="hero-location-input">
+                            </div>
+                        </div>
+                        <button type="button" class="btn-hero-find" onclick="launchApp('dashboard')">Find Now</button>
+                    </div>
+                </div>
             </section>
 
             <!-- 2. Stats Bar (Mediva Style Gradient Card) with Dynamic Animated Counts -->
@@ -321,34 +341,21 @@
                 </div>
             </section>
 
-            <!-- 3. Problem Statement (Screenshot 2) -->
-            <section class="problem-section max-width-container">
-                <div class="problem-content">
-                    <div class="warning-icon-wrapper">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-                        </svg>
-                    </div>
-                    <h2 class="problem-title">Healthcare information is difficult to manage.</h2>
-                    <p class="problem-text">
-                        Disconnected systems, scattered records, and forgotten medications lead to poor health outcomes. Patients struggle to keep track, and pharmacists lack verified access to prescription history. It shouldn't be this hard.
-                    </p>
-                </div>
-            </section>
 
             <!-- 4. Features Grid (Screenshot 2 & Screenshot 3) -->
             <section id="features" class="features-section max-width-container">
                 <div class="section-title-box">
                     <h2 class="section-heading">Intelligent Features for Better Care</h2>
-                    <p class="section-subheading">Everything you need to manage your health seamlessly in one secure platform.</p>
+                    <p class="section-subheading">Manage your health with confidence. Expert pharmacist consultation, smart appointments, and enterprise-grade security for your peace of mind.</p>
                 </div>
 
                 <div class="features-grid">
-                    <div class="feature-card">
+                    <div class="feature-card feature-card-consult" onclick="handleConsultPharmacistsClick()" title="Consult Licensed Pharmacists">
                         <div class="feature-icon-wrapper">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"/>
-                                <path d="m21 21-4.35-4.35"/>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                <path d="M8 9h8"/>
+                                <path d="M8 13h6"/>
                             </svg>
                         </div>
                         <h3 class="feature-title">Consult Pharmacists</h3>
@@ -357,7 +364,7 @@
                         </p>
                     </div>
 
-                    <div class="feature-card">
+                    <div class="feature-card feature-card-consult" onclick="handleAppointmentManagementClick()" title="Appointment Management System — Appointments & Doses">
                         <div class="feature-icon-wrapper">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -366,13 +373,13 @@
                                 <line x1="3" y1="10" x2="21" y2="10"/>
                             </svg>
                         </div>
-                        <h3 class="feature-title">Appointment Booking</h3>
+                        <h3 class="feature-title">Appointment Management System</h3>
                         <p class="feature-description">
-                            Schedule in-person visits or teleconsultations instantly. Avoid waiting rooms with smart queue management.
+                            Schedule pharmacist consultations, track upcoming appointments, manage doses, and receive automated reminders.
                         </p>
                     </div>
 
-                    <div class="feature-card">
+                    <div class="feature-card feature-card-consult" onclick="handleMedicalRecordsClick()" title="Medical Records Vault">
                         <div class="feature-icon-wrapper">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -384,7 +391,7 @@
                         </p>
                     </div>
 
-                    <div class="feature-card">
+                    <div class="feature-card feature-card-consult" onclick="handleNotificationsRemindersClick()" title="Notifications & Reminders">
                         <div class="feature-icon-wrapper">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -397,7 +404,7 @@
                         </p>
                     </div>
 
-                    <div class="feature-card">
+                    <div class="feature-card feature-card-consult" onclick="handleConsultPharmacistsClick()" title="Direct Pharmacist Tele-Consult">
                         <div class="feature-icon-wrapper">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -435,20 +442,20 @@
                         <h4 class="step-title">Create Account</h4>
                         <p class="step-desc">Set up your secure profile in minutes.</p>
                     </div>
-                    <div class="workflow-step">
+                    <div class="workflow-step" onclick="launchApp('upload-rx')" onkeydown="if(event.key==='Enter'||event.key===' ') launchApp('upload-rx')" role="button" tabindex="0" title="Upload Prescription">
                         <div class="step-circle">02</div>
-                        <h4 class="step-title">Find Service</h4>
-                        <p class="step-desc">Search for specialists or services needed.</p>
+                        <h4 class="step-title">Upload Prescription</h4>
+                        <p class="step-desc">Snap or upload your prescription — MediLink extracts your medicines automatically.</p>
                     </div>
-                    <div class="workflow-step">
+                    <div class="workflow-step" onclick="launchApp('verify')" onkeydown="if(event.key==='Enter'||event.key===' ') launchApp('verify')" role="button" tabindex="0" title="Verify & Check">
                         <div class="step-circle">03</div>
-                        <h4 class="step-title">Book Appointment</h4>
-                        <p class="step-desc">Schedule at your convenience instantly.</p>
+                        <h4 class="step-title">Verify & Check</h4>
+                        <p class="step-desc">Check drug interactions, find genuine alternatives, and confirm medicine authenticity.</p>
                     </div>
-                    <div class="workflow-step">
+                    <div class="workflow-step" onclick="handleNotificationsRemindersClick()" onkeydown="if(event.key==='Enter'||event.key===' ') handleNotificationsRemindersClick()" role="button" tabindex="0" title="Track & Stay Supported">
                         <div class="step-circle">04</div>
-                        <h4 class="step-title">Manage Healthcare</h4>
-                        <p class="step-desc">Track records and get smart reminders.</p>
+                        <h4 class="step-title">Track & Stay Supported</h4>
+                        <p class="step-desc">Get smart reminders, chat with a pharmacist, and find nearby help during emergencies.</p>
                     </div>
                 </div>
             </section>
@@ -486,7 +493,7 @@
                         <span class="audience-tag">FOR PATIENTS</span>
                         <h2 class="audience-heading">Empowering Your Health Journey</h2>
                         <p class="audience-desc">
-                            Take control of your health data. MediLink organizes your medical history, synchronizes with your wearables, and proactively manages your medication schedule so you can focus on living well.
+                            MediLink simplifies healthcare by bringing medicine management, pharmacist consultations, appointment scheduling, and personalized health support into one intelligent platform.
                         </p>
 
                         <div class="audience-checklist">
@@ -620,14 +627,20 @@
                         </div>
                         <span class="logo-text">MediLink</span>
                     </div>
-                    <p class="footer-desc">Smart Emergency Medicine & Health Assistant.</p>
+                    <p class="footer-desc">Advancing digital healthcare by integrating medicine management, pharmacist consultations, and appointment scheduling into a seamless experience.</p>
                 </div>
                 <div class="footer-links">
-                    <a href="#features">Features</a>
-                    <a href="#how-it-works">How It Works</a>
-                    <a href="#for-patients">For Patients</a>
-                    <a href="#for-pharmacists">For Pharmacists</a>
-                    <a href="#" onclick="launchApp('dashboard')">Live Demo</a>
+                    <div class="footer-col">
+                        <a href="#features">Features</a>
+                        <a href="#how-it-works">How It Works</a>
+                    </div>
+                    <div class="footer-col">
+                        <a href="#for-patients">Patients</a>
+                        <a href="#for-pharmacists">Pharmacists</a>
+                    </div>
+                    <div class="footer-col">
+                        <a href="#" onclick="launchApp('dashboard')">Live Demo</a>
+                    </div>
                 </div>
             </div>
             <div class="footer-bottom max-width-container">
@@ -1265,16 +1278,16 @@
                     </div>
                 </section>
 
-                <!-- Tab 6: Medicine Reminders -->
+                <!-- Tab 6: Appointments & Doses (Appointment Management System) -->
                 <section id="tab-reminders" class="tab-view">
                     <div class="section-header">
                         <div>
-                            <h2>⏰ Medicine Reminders & Dosage Scheduler</h2>
-                            <p class="text-muted">Powered by a background Java daemon thread that monitors scheduled doses and triggers real-time alerts.</p>
+                            <h2>📅 Appointments & Doses Scheduler</h2>
+                            <p class="text-muted">Appointment Management System — Track scheduled pharmacist appointments, medication intake times, and automated alerts.</p>
                         </div>
                         <div class="header-actions">
                             <button class="btn btn-secondary" onclick="triggerTestAlarm()">🔔 Test Instant Alarm</button>
-                            <button class="btn btn-primary" onclick="openReminderModal()">+ Add Schedule</button>
+                            <button class="btn btn-primary" onclick="openReminderModal()">+ Add Appointment / Dose</button>
                         </div>
                     </div>
 
@@ -1949,17 +1962,17 @@
     <div id="modal-reminder" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <h3>Schedule Medicine Reminder</h3>
+                <h3>Schedule Appointment / Medicine Reminder</h3>
                 <button class="btn-close" onclick="closeModal('modal-reminder')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="input-group">
-                    <label>Medicine Name:</label>
-                    <input type="text" id="rem-med-name" placeholder="e.g. Napa Extra">
+                    <label>Appointment / Medicine Name:</label>
+                    <input type="text" id="rem-med-name" placeholder="e.g. Appointment: Dr. Farhan Kabir or Napa Extra">
                 </div>
                 <div class="input-group">
-                    <label>Dosage:</label>
-                    <input type="text" id="rem-dosage" placeholder="e.g. 1 Tablet (500mg)">
+                    <label>Type / Dosage:</label>
+                    <input type="text" id="rem-dosage" placeholder="e.g. Teleconsultation or 1 Tablet (500mg)">
                 </div>
                 <div class="input-group">
                     <label>Scheduled Time:</label>
@@ -1968,19 +1981,20 @@
                 <div class="input-group">
                     <label>Frequency:</label>
                     <select id="rem-freq">
-                        <option value="DAILY">Daily</option>
+                        <option value="ONCE">Once (Appointment)</option>
+                        <option value="DAILY">Daily (Medication)</option>
                         <option value="TWICE_DAILY">Twice Daily</option>
                         <option value="WEEKLY">Weekly</option>
                     </select>
                 </div>
                 <div class="input-group">
-                    <label>Special Instructions:</label>
-                    <input type="text" id="rem-instructions" value="Take with full glass of water after food">
+                    <label>Special Instructions / Details:</label>
+                    <input type="text" id="rem-instructions" value="Pharmacist Consultation / Take with full glass of water">
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('modal-reminder')">Cancel</button>
-                <button class="btn btn-primary" onclick="submitNewReminder()">Save Reminder</button>
+                <button class="btn btn-primary" onclick="submitNewReminder()">Save Schedule</button>
             </div>
         </div>
     </div>
@@ -2319,11 +2333,7 @@
         </div>
     </div>
 
-        </div>
-    </div>
-
-
-    <script src="app.js?v=2.5"></script>
+    <script src="app.js?v=5.0"></script>
 </body>
 </html>
 

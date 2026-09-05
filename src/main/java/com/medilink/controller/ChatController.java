@@ -20,7 +20,7 @@ public class ChatController {
         this.chatService = chatService;
     }
 
-    @GetMapping
+    @GetMapping({"", "/", "/messages"})
     public ResponseEntity<Map<String, Object>> getChatHistory(
             @RequestParam(name = "user1", defaultValue = "usr_patient_01") String user1,
             @RequestParam(name = "user2", defaultValue = "usr_pharma_01") String user2) {
@@ -43,7 +43,7 @@ public class ChatController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping
+    @PostMapping({"", "/", "/send"})
     public ResponseEntity<Map<String, Object>> sendMessage(@RequestBody Map<String, String> data) {
         String senderId = data.getOrDefault("senderId", "usr_patient_01");
         String senderName = data.getOrDefault("senderName", "Rahim Ahmed");

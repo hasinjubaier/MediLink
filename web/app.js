@@ -35,30 +35,40 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Visitor Authentication Status (Restores session if logged in; landing page shown first)
-function initAuthGate() {
-    const savedUser = sessionStorage.getItem('medilink_user');
-    if (savedUser) {
-        try {
-            const user = JSON.parse(savedUser);
-            applyAuthenticatedUser(user, false);
-        } catch (e) {
-            sessionStorage.removeItem('medilink_user');
+function ensureAuthSessionLoaded() {
+    if (!state.isAuthenticated) {
+        const savedUser = sessionStorage.getItem('medilink_user') || localStorage.getItem('medilink_user');
+        if (savedUser) {
+            try {
+                const user = JSON.parse(savedUser);
+                if (user && user.email) {
+                    applyAuthenticatedUser(user, false);
+                }
+            } catch (e) {
+                sessionStorage.removeItem('medilink_user');
+                localStorage.removeItem('medilink_user');
+            }
         }
     }
+    return Boolean(state.isAuthenticated && state.currentUser && state.currentUser.email);
+}
+
+function initAuthGate() {
+    ensureAuthSessionLoaded();
 }
 
 // Smart "Get Started" Entry Controller:
 // - New / unauthenticated visitor -> directly opens Sign Up section!
 // - Authenticated / logged-in user -> directs classification-wise to their own role portal!
 function handleGetStartedClick() {
-    if (!state.isAuthenticated) {
+    if (!ensureAuthSessionLoaded()) {
         openAuthModal('signup');
         showToast('👋 Welcome! Please create an account to get started.');
         return;
     }
 
     // Authenticated user: navigate classification-wise to their own portal
-    const role = state.currentUser?.role || state.activeRole || 'PATIENT';
+    const role = (state.currentUser?.role || state.activeRole || 'PATIENT').toUpperCase();
     if (role === 'PHARMACIST') {
         launchApp('pharmacist');
     } else if (role === 'ADMIN') {
@@ -68,10 +78,105 @@ function handleGetStartedClick() {
     }
 }
 
+// Smart "Consult Pharmacists" Controller:
+// - New patient / unauthenticated visitor -> directly opens Sign Up section with Patient role!
+// - Patient already logged in -> directly opens Pharmacist Live Chat!
+function handleConsultPharmacistsClick() {
+    if (!ensureAuthSessionLoaded()) {
+        openAuthModal('signup');
+        selectAuthRole('PATIENT', 'signup');
+        showToast('👋 Sign up to connect directly with verified pharmacists.');
+        return;
+    }
+
+    // Patient or user is already logged in -> directly open Pharmacist Live Chat
+    launchApp('chat');
+    loadChatMessages();
+    setTimeout(() => {
+        const input = document.getElementById('chat-input');
+        if (input) input.focus();
+    }, 350);
+    showToast('💬 Connected to Pharmacist Live Chat');
+}
+
+// Smart "Notifications & Reminders" Controller:
+// - New patient / unauthenticated visitor -> directly opens Sign Up section with Patient role!
+// - Patient already logged in -> directly opens Notifications icon & dropdown!
+function handleNotificationsRemindersClick() {
+    if (!ensureAuthSessionLoaded()) {
+        openAuthModal('signup');
+        selectAuthRole('PATIENT', 'signup');
+        showToast('👋 Sign up to manage medication reminders and health alerts.');
+        return;
+    }
+
+    // Patient or user is already logged in -> directly open Notifications icon
+    openNotificationsIcon();
+}
+
+// Smart "Appointment Management System" Controller:
+// - Directly links/connects to the "Appointments & Doses" feature (tab-reminders)
+// - If unauthenticated -> directly opens Sign Up / Sign In modal
+// - If authenticated -> smoothly navigates to the Appointments & Doses tab and refreshes schedule data
+function handleAppointmentManagementClick() {
+    if (!ensureAuthSessionLoaded()) {
+        openAuthModal('signup');
+        selectAuthRole('PATIENT', 'signup');
+        showToast('👋 Please create an account or sign in to access Appointments & Doses.');
+        return;
+    }
+
+    launchApp('reminders');
+    showToast('📅 Connected to Appointments & Doses');
+}
+
+// Smart "Medical Records" Controller:
+// - Links the landing page Medical Records card (first screenshot) directly to the Medical Records tab (second screenshot)
+// - If unauthenticated -> opens Sign Up / Sign In modal with Patient role pre-selected
+// - If authenticated -> smoothly navigates to the Medical Records tab and loads records
+function handleMedicalRecordsClick() {
+    if (!ensureAuthSessionLoaded()) {
+        openAuthModal('signup');
+        selectAuthRole('PATIENT', 'signup');
+        showToast('👋 Sign up or log in to access your secure Medical Records vault.');
+        return;
+    }
+
+    launchApp('prescriptions');
+    showToast('📄 Opened Medical Records Vault');
+}
+
+function openNotificationsIcon() {
+    document.getElementById('view-landing').classList.remove('active');
+    document.getElementById('view-app').classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    setTimeout(() => {
+        const notifBell = document.getElementById('btn-notification-bell');
+        const notifMenu = document.getElementById('notification-dropdown-menu');
+
+        document.querySelectorAll('.notification-dropdown-menu').forEach(m => {
+            if (m !== notifMenu) m.classList.remove('active');
+        });
+
+        if (notifMenu) {
+            notifMenu.classList.add('active');
+            renderNotifications();
+        }
+
+        if (notifBell) {
+            notifBell.classList.add('pulse-highlight');
+            setTimeout(() => notifBell.classList.remove('pulse-highlight'), 2500);
+        }
+
+        showToast('🔔 Notifications & Reminders opened.');
+    }, 250);
+}
+
 // View Switching: Landing Page <-> Interactive App
 function launchApp(context) {
     // If not authenticated and not accessing public emergency finder, guide to Sign Up
-    if (!state.isAuthenticated && context !== 'emergency') {
+    if (!ensureAuthSessionLoaded() && context !== 'emergency') {
         openAuthModal('signup');
         showToast('Please sign up or log in to access your portal.');
         return;
@@ -95,6 +200,12 @@ function launchApp(context) {
         switchTab('medicines');
     } else if (context === 'prescriptions') {
         switchTab('prescriptions');
+    } else if (context === 'reminders') {
+        switchTab('reminders');
+    } else if (context === 'upload-rx') {
+        switchTab('upload-rx');
+    } else if (context === 'verify') {
+        switchTab('verify');
     } else if (context === 'settings') {
         switchTab('settings');
     } else {
@@ -138,15 +249,38 @@ function openAuthModal(mode = 'signin') {
 }
 
 // Direct Create Account Trigger (Landing Page Workflow Step 01)
+// - If not logged in -> directly open Sign Up section
+// - If logged in -> directly open user's dashboard depending on account email & role [patient/pharmacist/admin]
 function handleCreateAccountClick() {
-    openAuthModal('signup');
-    showToast('Create Account');
-    if (typeof addNotification === 'function') {
-        addNotification({
-            icon: '👤',
-            title: 'Create Account',
-            text: 'Welcome! Create your secure MediLink account to get started.'
-        });
+    const isLoggedIn = ensureAuthSessionLoaded();
+
+    if (!isLoggedIn) {
+        openAuthModal('signup');
+        showToast('Create Account');
+        if (typeof addNotification === 'function') {
+            addNotification({
+                icon: '👤',
+                title: 'Create Account',
+                text: 'Welcome! Create your secure MediLink account to get started.'
+            });
+        }
+        return;
+    }
+
+    // Authenticated user: navigate directly to their dashboard depending on account email & role
+    const user = state.currentUser;
+    const email = (user?.email || '').trim().toLowerCase();
+    const role = (user?.role || state.activeRole || 'PATIENT').toUpperCase();
+
+    if (role === 'PHARMACIST' || email.includes('pharma') || email.includes('pharmacist')) {
+        launchApp('pharmacist');
+        showToast(`👨‍⚕️ Welcome back ${user?.name || 'Pharmacist'}! Opened Pharmacist Dashboard.`);
+    } else if (role === 'ADMIN' || email.includes('admin')) {
+        launchApp('admin');
+        showToast(`🛡️ Welcome back ${user?.name || 'Admin'}! Opened Administrator Dashboard.`);
+    } else {
+        launchApp('patient');
+        showToast(`🏥 Welcome back ${user?.name || 'Patient'}! Opened Patient Health Dashboard.`);
     }
 }
 
@@ -715,6 +849,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
 
     if (saveToStorage) {
         sessionStorage.setItem('medilink_user', JSON.stringify(state.currentUser));
+        localStorage.setItem('medilink_user', JSON.stringify(state.currentUser));
     }
 
     const avatarAssets = getUserAvatarAssets(user.name, user.gender, user.role);
@@ -1013,6 +1148,7 @@ async function saveProfileSettings() {
             }
 
             sessionStorage.setItem('medilink_user', JSON.stringify(state.currentUser));
+            localStorage.setItem('medilink_user', JSON.stringify(state.currentUser));
 
             const avatarAssets = getUserAvatarAssets(fullName, gender, state.currentUser.role);
 
@@ -1259,7 +1395,9 @@ function removeEmergencyContactRow(btn) {
 
 function handleUserLogout() {
     sessionStorage.removeItem('medilink_user');
+    localStorage.removeItem('medilink_user');
     state.isAuthenticated = false;
+    state.currentUser = null;
 
     // Reset Landing Header UI
     const guestBtns = document.getElementById('nav-guest-buttons');
@@ -1388,7 +1526,7 @@ function animateCounter(elementId, start, end, duration, formatFn) {
 // Landing Page Header Navigation & Scrollspy
 function initLandingNav() {
     const navLinks = document.querySelectorAll('.landing-header .nav-link');
-    const sections = document.querySelectorAll('#features, #how-it-works, #for-patients, #for-doctors, #about');
+    const sections = document.querySelectorAll('#features, #how-it-works, #for-patients, #for-pharmacists, #about');
 
     navLinks.forEach(link => {
         link.addEventListener('click', () => {
@@ -1482,6 +1620,16 @@ function switchTab(tabId) {
         } else {
             topUploadBtn.style.display = 'block';
         }
+    }
+
+    if (tabId === 'chat') {
+        loadChatMessages();
+    }
+    if (tabId === 'reminders') {
+        loadReminders();
+    }
+    if (tabId === 'prescriptions') {
+        loadPrescriptions();
     }
 }
 
@@ -2246,18 +2394,22 @@ function renderReminders(list) {
         return;
     }
 
-    container.innerHTML = list.map(r => `
+    container.innerHTML = list.map(r => {
+        const isAppt = r.medicine && (r.medicine.toLowerCase().includes('appointment') || r.dosage.toLowerCase().includes('consult'));
+        const icon = isAppt ? '📅' : '⏰';
+        return `
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <h3 style="font-size:1.15rem; font-weight:800;">⏰ ${r.medicine} (${r.dosage})</h3>
+                <h3 style="font-size:1.15rem; font-weight:800;">${icon} ${r.medicine} (${r.dosage})</h3>
                 <p class="text-muted">Time: <strong>${r.time}</strong> • Frequency: ${r.frequency}</p>
                 <small class="text-muted">${r.instructions}</small>
             </div>
             <span class="status-pill ${r.active ? 'status-verified' : 'status-extracted'}">
-                ${r.active ? 'Active Scheduler' : 'Paused'}
+                ${r.active ? (isAppt ? 'Confirmed Schedule' : 'Active Scheduler') : 'Paused'}
             </span>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function openReminderModal() {
