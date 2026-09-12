@@ -3,9 +3,11 @@ Write-Host "   MediLink 2.0 - Standalone Frontend Launcher     " -ForegroundColo
 Write-Host "===================================================" -ForegroundColor Cyan
 
 $frontendDir = Join-Path $PSScriptRoot "frontend"
-Set-Location $frontendDir
-
-Write-Host "Starting Frontend Client on http://localhost:3000 ..." -ForegroundColor Yellow
-Write-Host "Target API: http://localhost:8080" -ForegroundColor DarkGray
-
-node server.js
+Push-Location $frontendDir
+try {
+    Write-Host "Starting Frontend Client on http://localhost:3000 ..." -ForegroundColor Yellow
+    Write-Host "Target API: http://localhost:8080" -ForegroundColor DarkGray
+    node server.js
+} finally {
+    Pop-Location
+}

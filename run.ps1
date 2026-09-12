@@ -35,18 +35,26 @@ switch ($choice) {
     }
     "3" {
         Write-Host "Starting Frontend Client on http://localhost:3000 ..." -ForegroundColor Yellow
-        Set-Location "$PSScriptRoot\frontend"
-        node server.js
+        Push-Location "$PSScriptRoot\frontend"
+        try {
+            node server.js
+        } finally {
+            Pop-Location
+        }
     }
     Default {
         Write-Host "Launching MediLink 2.0 Fullstack Application..." -ForegroundColor Green
         Write-Host "Starting Backend API in separate window..." -ForegroundColor Cyan
-        Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\run-backend.ps1"
+        Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "$PSScriptRoot\run-backend.ps1"
         
         Start-Sleep -Seconds 2
         
         Write-Host "Starting Frontend Client on http://localhost:3000 ..." -ForegroundColor Cyan
-        Set-Location "$PSScriptRoot\frontend"
-        node server.js
+        Push-Location "$PSScriptRoot\frontend"
+        try {
+            node server.js
+        } finally {
+            Pop-Location
+        }
     }
 }

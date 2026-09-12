@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuthGate();
     initAiAssistant();
     renderCountryDropdown();
+    updateUserAvatars(state.currentUser);
 });
 
 // Visitor Authentication Status (Restores session if logged in; landing page shown first)
@@ -269,7 +270,7 @@ function handleCreateAccountClick() {
         showToast('Create Account');
         if (typeof addNotification === 'function') {
             addNotification({
-                icon: '👤',
+                icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
                 title: 'Create Account',
                 text: 'Welcome! Create your secure MediLink account to get started.'
             });
@@ -678,7 +679,7 @@ async function handleAuthSubmit(event, formType) {
                 const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
                     alertBox.innerHTML = `
-                        <span class="alert-icon">⚠️</span>
+                        <span class="alert-icon" style="display:flex; align-items:center; color:#f59e0b;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></span>
                         <div>
                             <strong>Email not registered!</strong> No account found for <span style="color:#ffffff;">${email}</span>. 
                             <a href="javascript:void(0)" onclick="setAuthMode('signup')" class="alert-link">Click here to Sign Up first ➔</a>
@@ -703,7 +704,7 @@ async function handleAuthSubmit(event, formType) {
                 const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
                     alertBox.innerHTML = `
-                        <span class="alert-icon">⚠️</span>
+                        <span class="alert-icon" style="display:flex; align-items:center; color:#f59e0b;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></span>
                         <div>
                             <strong>Incorrect password!</strong> 
                             <a href="javascript:void(0)" onclick="openForgotPasswordModal('${email}')" class="alert-link">Forgot password? Reset it here ➔</a>
@@ -715,7 +716,7 @@ async function handleAuthSubmit(event, formType) {
             } else {
                 const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
-                    alertBox.innerHTML = `<span class="alert-icon">❌</span><div>${data.message || 'Login failed. Check credentials.'}</div>`;
+                    alertBox.innerHTML = `<span class="alert-icon" style="display:flex; align-items:center; color:#ef4444;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg></span><div>${data.message || 'Login failed. Check credentials.'}</div>`;
                     alertBox.style.display = 'flex';
                 }
                 showToast(data.message || 'Login failed. Check credentials.');
@@ -840,6 +841,106 @@ function getUserAvatarAssets(name = '', gender = '', role = 'PATIENT') {
     }
 }
 
+// Global Avatar Manager: Synchronizes patient profile picture or avatar across:
+// 1) App top navbar circle button (#app-header-user-avatar)
+// 2) Patient dashboard banner (#patient-dash-avatar)
+// 3) Landing page profile pill (#header-user-avatar)
+// 4) Settings photo preview (#settings-avatar-img)
+// 5) Support center avatar (#support-avatar-img)
+function updateUserAvatars(user = state.currentUser) {
+    if (!user) return;
+    const avatarAssets = getUserAvatarAssets(user.name, user.gender, user.role);
+    
+    // Priority: custom uploaded photo -> user.photo/avatar -> gender-matched avatar library photo
+    const avatarSrc = (user.customAvatar && user.customAvatar.trim())
+        || (user.photo && user.photo.trim())
+        || (user.avatar && user.avatar.trim())
+        || (user.profilePic && user.profilePic.trim())
+        || (avatarAssets && avatarAssets.photo)
+        || '';
+
+    // 1. App Top Navbar Profile Button (Header right in #view-app)
+    const appHeaderAvatar = document.getElementById('app-header-user-avatar');
+    if (appHeaderAvatar) {
+        if (avatarSrc) {
+            appHeaderAvatar.innerHTML = `
+                <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(user.name || 'User Profile')}" class="nav-avatar-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            `;
+            appHeaderAvatar.classList.add('has-avatar-img');
+        } else {
+            appHeaderAvatar.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            `;
+            appHeaderAvatar.classList.remove('has-avatar-img');
+        }
+    }
+
+    // 2. Patient Dashboard Welcome Banner Avatar (#patient-dash-avatar)
+    const dashAvatar = document.getElementById('patient-dash-avatar');
+    if (dashAvatar) {
+        if (avatarSrc) {
+            dashAvatar.innerHTML = `
+                <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(user.name || 'Patient')}" class="dash-avatar-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            `;
+            dashAvatar.classList.add('has-avatar-img');
+        } else {
+            dashAvatar.innerHTML = `
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            `;
+            dashAvatar.classList.remove('has-avatar-img');
+        }
+    }
+
+    // 3. Landing Navbar User Profile Pill Avatar (#header-user-avatar)
+    const landingAvatar = document.getElementById('header-user-avatar');
+    if (landingAvatar) {
+        if (avatarSrc) {
+            landingAvatar.innerHTML = `
+                <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(user.name || 'User')}" class="pill-avatar-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='block';">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            `;
+            landingAvatar.classList.add('has-avatar-img');
+        } else {
+            landingAvatar.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            `;
+            landingAvatar.classList.remove('has-avatar-img');
+        }
+    }
+
+    // 4. Settings Avatar Image (#settings-avatar-img)
+    const settingsAvatarImg = document.getElementById('settings-avatar-img');
+    if (settingsAvatarImg && avatarSrc) {
+        settingsAvatarImg.src = avatarSrc;
+    }
+
+    // 5. Help Center Support Avatar (#support-avatar-img)
+    const supportAvatar = document.getElementById('support-avatar-img');
+    if (supportAvatar && avatarSrc) {
+        supportAvatar.src = avatarSrc;
+    }
+}
+
 // ========================================================
 // FORGOT PASSWORD & RECOVERY CONTROLLER
 // ========================================================
@@ -877,8 +978,10 @@ function closeForgotPasswordModal() {
 
 function showModalForgotAlert(msg, isSuccess = false) {
     const alertBox = document.getElementById('modal-forgot-alert');
-    if (!alertBox) return;
-    alertBox.innerHTML = `<span class="alert-icon">${isSuccess ? '✅' : '⚠️'}</span><div>${msg}</div>`;
+    const alertIconSvg = isSuccess
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>`;
+    alertBox.innerHTML = `<span class="alert-icon" style="display:flex; align-items:center;">${alertIconSvg}</span><div>${msg}</div>`;
     alertBox.style.display = 'flex';
     if (isSuccess) {
         alertBox.style.background = 'rgba(16, 185, 129, 0.15)';
@@ -945,7 +1048,7 @@ async function requestModalPasswordResetOtp(isResend = false) {
     const btn = document.getElementById('btn-modal-send-otp');
     if (btn && !isResend) {
         btn.disabled = true;
-        btn.textContent = 'Sending Verification Code... ⏳';
+        btn.textContent = 'Sending Verification Code...';
     }
 
     try {
@@ -966,15 +1069,15 @@ async function requestModalPasswordResetOtp(isResend = false) {
 
             if (data.liveEmailSent) {
                 if (demoPill) demoPill.style.display = 'none';
-                showModalForgotAlert(`📬 Live verification email dispatched to ${email}! Please check your inbox (and spam folder).`, true);
-                showToast(`📧 Live verification email sent to ${email}!`);
+                showModalForgotAlert(`Live verification email dispatched to ${email}! Please check your inbox (and spam folder).`, true);
+                showToast(`Live verification email sent to ${email}!`);
             } else {
                 if (demoPill && demoVal && data.otp) {
                     demoVal.textContent = data.otp;
                     demoPill.style.display = 'flex';
                 }
-                showModalForgotAlert(`⚠️ Live SMTP not configured in medilink_config.properties. Demo OTP is provided below for testing.`, true);
-                showToast(`🔑 Demo OTP generated: ${data.otp}`);
+                showModalForgotAlert(`Live SMTP not configured in medilink_config.properties. Demo OTP is provided below for testing.`, true);
+                showToast(`Demo OTP generated: ${data.otp}`);
             }
 
             setModalRecoveryStep(2);
@@ -1166,7 +1269,7 @@ function backToSignInFromForgot(resetSuccess = false) {
         const alertBox = document.getElementById('signin-alert-box');
         if (alertBox) {
             alertBox.innerHTML = `
-                <span class="alert-icon">🎉</span>
+                <span class="alert-icon" style="display:flex; align-items:center; color:#10b981;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
                 <div style="color: #6ee7b7;">
                     <strong>Password updated!</strong> Please click Sign In to continue.
                 </div>
@@ -1226,7 +1329,6 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
     if (userProfile) userProfile.style.display = 'flex';
     if (nameLabel) nameLabel.textContent = user.name;
     if (roleLabel) roleLabel.textContent = user.role;
-    if (avatar) avatar.textContent = avatarAssets.emoji;
 
     // Update Central Top Navbar Portal Badge
     const portalIndicator = document.getElementById('portal-indicator-text');
@@ -1240,11 +1342,12 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
     // 2. Update Patient Dashboard Header
     const dashName = document.getElementById('patient-dash-name');
     const dashBadge = document.getElementById('patient-dash-badge');
-    const dashAvatar = document.getElementById('patient-dash-avatar');
 
     if (dashName) dashName.textContent = user.name;
     if (dashBadge) dashBadge.textContent = `${user.role} DASHBOARD`;
-    if (dashAvatar) dashAvatar.textContent = avatarAssets.emoji;
+
+    // Synchronize all user avatars across top navbar, dashboard banner, and settings
+    updateUserAvatars(user);
 
     // 3. Adapt Sidebar Navigation to Active Role
     const dashTabBtn = document.getElementById('tab-btn-dashboard');
@@ -1387,7 +1490,7 @@ function syncProfileSettingsFields(user) {
                         <span class="c-label">Phone</span>
                         <div style="display:flex; align-items:center; gap:6px;">
                             <input type="text" class="c-input contact-phone" placeholder="+880 1700-000000" value="${escapeHtml(contact.phone || '')}">
-                            <button type="button" onclick="removeEmergencyContactRow(this)" title="Delete Contact" style="background:none; border:none; color:#ef4444; font-size:1.1rem; cursor:pointer;">🗑️</button>
+                            <button type="button" onclick="removeEmergencyContactRow(this)" title="Delete Contact" style="background:none; border:none; color:#ef4444; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button>
                         </div>
                     </div>
                 `;
@@ -1532,18 +1635,14 @@ async function saveProfileSettings() {
 
             // Update all UI badges & avatars
             const nameLabel = document.getElementById('header-user-name');
-            const avatarLabel = document.getElementById('header-user-avatar');
             const dashName = document.getElementById('patient-dash-name');
-            const dashAvatar = document.getElementById('patient-dash-avatar');
             const cardName = document.getElementById('settings-card-name');
-            const avatarImg = document.getElementById('settings-avatar-img');
 
             if (nameLabel) nameLabel.textContent = fullName;
-            if (avatarLabel) avatarLabel.textContent = avatarAssets.emoji;
             if (dashName) dashName.textContent = fullName;
-            if (dashAvatar) dashAvatar.textContent = avatarAssets.emoji;
             if (cardName) cardName.textContent = fullName;
-            if (avatarImg && !state.currentUser.customAvatar) avatarImg.src = avatarAssets.photo;
+
+            updateUserAvatars(state.currentUser);
 
             showToast(`💾 Changes saved & updated in PostgreSQL database!`);
         } else {
@@ -1615,6 +1714,9 @@ function handlePatientPhotoUpload(event) {
                     })
                 }).catch(e => console.error('Error syncing photo to DB:', e));
             }
+
+            // Immediately reflect newly uploaded avatar in top navbar and dashboard banner
+            updateUserAvatars(state.currentUser);
         }
 
         showToast(`✅ Profile photo uploaded & saved! (${file.name})`);
@@ -1747,7 +1849,7 @@ function openAddContactModal() {
             <span class="c-label">Phone</span>
             <div style="display:flex; align-items:center; gap:6px;">
                 <input type="text" class="c-input contact-phone" placeholder="+880 1700-000000" value="">
-                <button type="button" onclick="removeEmergencyContactRow(this)" title="Delete Contact" style="background:none; border:none; color:#ef4444; font-size:1.1rem; cursor:pointer;">🗑️</button>
+                <button type="button" onclick="removeEmergencyContactRow(this)" title="Delete Contact" style="background:none; border:none; color:#ef4444; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button>
             </div>
         </div>
     `;
@@ -1904,21 +2006,30 @@ function animateCounter(elementId, start, end, duration, formatFn) {
 // Landing Page Header Navigation & Scrollspy
 function initLandingNav() {
     const navLinks = document.querySelectorAll('.landing-header .nav-link');
-    const sections = document.querySelectorAll('#features, #how-it-works, #for-patients, #for-pharmacists, #about');
+    const sections = document.querySelectorAll('#features, #how-it-works, #for-patients, #for-pharmacists, #testimonials, #faq, #about');
+
+    let clickLockTimeout = null;
 
     navLinks.forEach(link => {
         link.addEventListener('click', () => {
             navLinks.forEach(l => l.classList.remove('active'));
             link.classList.add('active');
+
+            // Temporarily ignore scrollspy updates while smooth scrolling into view
+            clearTimeout(clickLockTimeout);
+            clickLockTimeout = setTimeout(() => {
+                clickLockTimeout = null;
+            }, 800);
         });
     });
 
     window.addEventListener('scroll', () => {
+        if (clickLockTimeout) return;
         const viewLanding = document.getElementById('view-landing');
         if (!viewLanding || !viewLanding.classList.contains('active')) return;
 
         let activeId = '';
-        const scrollPos = window.scrollY + 180;
+        const scrollPos = window.scrollY + 200;
 
         sections.forEach(sec => {
             const top = sec.offsetTop;
@@ -1927,6 +2038,11 @@ function initLandingNav() {
                 activeId = sec.getAttribute('id');
             }
         });
+
+        // If scrolled to the bottom of the page, activate the last section
+        if ((window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 60)) {
+            activeId = 'about';
+        }
 
         if (activeId) {
             navLinks.forEach(link => {
@@ -2067,7 +2183,7 @@ function initRealTimeStream() {
             if (raw.includes('STOCK_UPDATE')) {
                 loadStocks();
                 addNotification({
-                    icon: '🔔',
+                    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
                     title: 'Pharmacy Stock Update',
                     text: raw.replace('STOCK_UPDATE:', '').trim(),
                     time: 'Just now'
@@ -2076,7 +2192,7 @@ function initRealTimeStream() {
             if (raw.includes('PRESCRIPTION_')) {
                 loadPrescriptions();
                 addNotification({
-                    icon: '📝',
+                    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>',
                     title: 'Prescription Status Update',
                     text: raw.trim(),
                     time: 'Just now'
@@ -2110,12 +2226,12 @@ function initRealTimeStream() {
 
                 if (chatMsg && isForMe && !isFromMe) {
                     const title = currentRole === 'PHARMACIST'
-                        ? `💬 Patient Consultation: ${chatMsg.senderName || 'Patient'}`
-                        : `💬 Pharmacist Advice: ${chatMsg.senderName || 'Dr. Pharmacist'}`;
+                        ? `Patient Consultation: ${chatMsg.senderName || 'Patient'}`
+                        : `Pharmacist Advice: ${chatMsg.senderName || 'Dr. Pharmacist'}`;
                     const text = chatMsg.content || 'You have received a new consultation message.';
 
                     addNotification({
-                        icon: '💬',
+                        icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>',
                         title: title,
                         text: text,
                         time: 'Just now'
@@ -2191,13 +2307,37 @@ function renderMedicines(list) {
                     <div class="med-price" id="med-price-${m.id}" data-price="${m.unitPrice}">BDT ${m.unitPrice.toFixed(2)}</div>
                 </div>
                 <div class="med-company">Mfg: ${escapeHtml(m.company || '')} (${escapeHtml(m.category || '')})</div>
-                <div class="med-badge-box">🛡️ ${escapeHtml(m.displayBadge || 'Standard')}</div>
+                <div class="med-badge-box" style="display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-blue, #1d4ed8); flex-shrink:0;">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="m9 12 2 2 4-4"/>
+                    </svg>
+                    <span>${escapeHtml(m.displayBadge || 'Standard')}</span>
+                </div>
                 ${m.sideEffects ? `<small class="text-muted" style="display:block; margin-top:8px;"><strong>Note:</strong> ${escapeHtml(m.sideEffects)}</small>` : ''}
             </div>
             <div class="med-card-actions">
-                <button class="btn btn-secondary" style="flex:1;" onclick="findAlternatives('${escapeHtml(m.genericName)}')">🔍 Generic Alts</button>
-                <button class="btn btn-secondary" style="flex:1; border-color:#0284c7; color:#0284c7; font-weight:600;" onclick="openPriceComparisonModal('${m.id}', '${escapeHtml(m.brandName)}')">🏷️ Compare Prices</button>
-                <button class="btn btn-primary" style="flex:1;" onclick="checkAvailabilityFor('${escapeHtml(m.brandName)}')">📍 Find Stock</button>
+                <button class="btn btn-secondary" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:0.82rem; font-weight:600; padding:8px 10px; min-height:38px;" onclick="findAlternatives('${escapeHtml(m.genericName)}')">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                    </svg>
+                    <span>Generic Alts</span>
+                </button>
+                <button class="btn btn-secondary" style="flex:1; border-color:#0284c7; color:#0284c7; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:0.82rem; padding:8px 10px; min-height:38px;" onclick="openPriceComparisonModal('${m.id}', '${escapeHtml(m.brandName)}')">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                        <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/>
+                        <path d="M7 7h.01"/>
+                    </svg>
+                    <span>Compare Prices</span>
+                </button>
+                <button class="btn btn-primary" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px; font-size:0.82rem; font-weight:600; padding:8px 10px; min-height:38px;" onclick="checkAvailabilityFor('${escapeHtml(m.brandName)}')">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    <span>Find Stock</span>
+                </button>
             </div>
         </div>
     `).join('');
@@ -2245,7 +2385,13 @@ function renderPriceComparisonData(data) {
     banner.innerHTML = `
         <div class="price-banner-content">
             <div class="price-banner-med-info">
-                <span class="price-banner-badge">💊 ${escapeHtml(data.genericName || '')}</span>
+                <span class="price-banner-badge" style="display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                        <path d="m8.5 8.5 7 7"/>
+                    </svg>
+                    <span>${escapeHtml(data.genericName || '')}</span>
+                </span>
                 <h3 class="price-banner-title">${escapeHtml(data.brandName || '')} <small>${escapeHtml(data.strength || '')}</small></h3>
                 <p class="price-banner-company">Mfg: ${escapeHtml(data.company || 'Licensed Manufacturer')}</p>
             </div>
@@ -2280,15 +2426,24 @@ function renderPriceComparisonData(data) {
             <div class="pharma-price-row-card ${isBest ? 'is-best-price' : ''}">
                 <div class="pharma-price-info">
                     <div class="pharma-price-header">
-                        <strong class="pharma-title">🏥 ${escapeHtml(p.pharmacyName)}</strong>
-                        <span class="pharma-area-tag">📍 ${escapeHtml(p.area)}</span>
-                        ${isBest ? '<span class="best-price-pill">🏆 Lowest Price</span>' : ''}
+                        <strong class="pharma-title" style="display:inline-flex; align-items:center; gap:6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+                            <span>${escapeHtml(p.pharmacyName)}</span>
+                        </strong>
+                        <span class="pharma-area-tag" style="display:inline-flex; align-items:center; gap:4px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                                <circle cx="12" cy="10" r="3"/>
+                            </svg>
+                            <span>${escapeHtml(p.area)}</span>
+                        </span>
+                        ${isBest ? '<span class="best-price-pill" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>Lowest Price</span>' : ''}
                         ${p.is24Hours ? '<span class="badge-24h">24/7</span>' : ''}
                     </div>
                     <p class="pharma-address">${escapeHtml(p.address)}</p>
                     <div class="pharma-stock-info">
                         <span class="stock-badge ${p.quantity < 10 ? 'stock-low' : 'stock-ok'}">
-                            ${p.quantity > 0 ? `📦 ${p.quantity} Units in Stock` : '⚠️ Out of Stock'}
+                            ${p.quantity > 0 ? `<span style="display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>${p.quantity} Units in Stock</span>` : '<span style="display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>Out of Stock</span>'}
                         </span>
                         ${diff > 0 ? `<span class="price-diff-note">+BDT ${diff.toFixed(2)} higher than best deal</span>` : '<span class="price-diff-note best">Best value in Dhaka</span>'}
                     </div>
@@ -2300,11 +2455,13 @@ function renderPriceComparisonData(data) {
                         <span class="unit-per">/ unit</span>
                     </div>
                     <div style="display:flex; gap:6px; flex-direction:column; width:100%;">
-                        <a href="tel:${p.phone || '+8801711001122'}" class="btn btn-secondary btn-sm" style="text-decoration:none; text-align:center; padding:6px 12px;">
-                            📞 Call (${escapeHtml(p.phone || 'Contact')})
+                        <a href="tel:${p.phone || '+8801711001122'}" class="btn btn-secondary btn-sm" style="text-decoration:none; text-align:center; padding:6px 12px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            <span>Call (${escapeHtml(p.phone || 'Contact')})</span>
                         </a>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="startPharmacyChat('${escapeHtml(p.pharmacyName)}')">
-                            💬 Message
+                        <button type="button" class="btn btn-primary btn-sm" onclick="startPharmacyChat('${escapeHtml(p.pharmacyName)}')" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <span>Message</span>
                         </button>
                     </div>
                 </div>
@@ -2392,24 +2549,46 @@ function renderPrescriptions(list) {
                 </span>
             </div>
 
-            <div style="background:#f8fafc; padding:14px; border-radius:8px; margin-bottom:14px; font-family:'JetBrains Mono', monospace; font-size:0.85rem;">
-                ${rx.rawScanText}
+            <div class="rx-ocr-text-block">
+                <div class="rx-ocr-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                        <path d="M12 11h4"/>
+                        <path d="M12 16h4"/>
+                        <path d="M8 11h.01"/>
+                        <path d="M8 16h.01"/>
+                    </svg>
+                    <span>OCR Extracted Clinical Text</span>
+                </div>
+                <div class="rx-ocr-text-content">${escapeHtml(rx.rawScanText)}</div>
             </div>
 
             ${rx.voiceNoteAudio ? `
-            <div class="rx-voicenote-card" style="margin: 10px 0 14px; padding: 10px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
-                <span style="font-weight: 700; font-size: 0.84rem; color: #1e40af; display:flex; align-items:center; gap:6px;">
-                    🎙️ Patient Voice Note (Symptom Audio Memo):
+            <div class="rx-voicenote-card">
+                <span class="rx-voicenote-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="22"/>
+                    </svg>
+                    Patient Voice Note (Symptom Audio Memo):
                 </span>
                 <audio controls src="${rx.voiceNoteAudio}" style="height: 32px; flex:1; min-width:220px;"></audio>
             </div>` : ''}
 
             <h4>Extracted Dosage Items:</h4>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; margin-top:8px; margin-bottom:16px;">
+            <div class="rx-dosage-grid">
                 ${rx.items.map(item => `
-                    <div style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:white;">
-                        <strong>💊 ${item.medicineName}</strong> (${item.dosage})<br>
-                        <small class="text-muted">Freq: ${item.frequency} | ${item.instructions}</small>
+                    <div class="rx-dosage-item-card">
+                        <strong class="rx-dosage-title">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rx-dosage-pill-svg">
+                                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                                <path d="m8.5 8.5 7 7"/>
+                            </svg>
+                            <span>${escapeHtml(item.medicineName)}</span>
+                        </strong> (${escapeHtml(item.dosage)})<br>
+                        <small class="text-muted">Freq: ${escapeHtml(item.frequency)} | ${escapeHtml(item.instructions)}</small>
                     </div>
                 `).join('')}
             </div>
@@ -2421,11 +2600,16 @@ function renderPrescriptions(list) {
                             Advance State (State Pattern Workflow) ➔
                         </button>
                     ` : `
-                        <span style="color:#059669; font-weight:700;">✅ Dispense Ready (Pharmacist Verified)</span>
+                        <span style="color:#059669; font-weight:700; display:inline-flex; align-items:center; gap:5px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>Dispense Ready (Pharmacist Verified)</span>
                     `}
                 </div>
-                <button class="btn btn-secondary" style="color:#ef4444; border-color:#fecaca; font-size:0.8rem;" onclick="deletePrescription('${rx.id}')">
-                    🗑️ Remove Record
+                <button class="btn btn-secondary" style="color:#ef4444; border-color:#fecaca; font-size:0.8rem; display:inline-flex; align-items:center; gap:6px;" onclick="deletePrescription('${rx.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18"/>
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    </svg>
+                    Remove Record
                 </button>
             </div>
         </div>
@@ -2507,7 +2691,7 @@ async function toggleVoiceRecording(scope) {
         }, 1000);
 
         const btnText = document.getElementById(scope === 'modal' ? 'rec-btn-text-modal' : 'rec-btn-text-page');
-        if (btnText) btnText.textContent = '⏹️ Stop Recording';
+        if (btnText) btnText.textContent = 'Stop Recording';
 
         showToast('🎙️ Recording voice note... Speak your symptoms clearly.');
     } catch (err) {
@@ -2520,7 +2704,7 @@ function stopVoiceRecording(scope) {
     if (currentMediaRecorder && currentMediaRecorder.state === 'recording') {
         currentMediaRecorder.stop();
         const btnText = document.getElementById(scope === 'modal' ? 'rec-btn-text-modal' : 'rec-btn-text-page');
-        if (btnText) btnText.textContent = '🎙️ Re-record';
+        if (btnText) btnText.textContent = 'Re-record';
         showToast('Audio note captured successfully!');
     }
 }
@@ -2647,8 +2831,9 @@ function renderStocks(list) {
             </td>
             <td>BDT ${s.unitPrice.toFixed(2)}</td>
             <td>
-                <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="openStockUpdateModal('${s.id}', '${s.medicineBrandName}', ${s.quantity})">
-                    ✏️ Edit Stock
+                <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem; display:inline-flex; align-items:center; gap:5px;" onclick="openStockUpdateModal('${s.id}', '${s.medicineBrandName}', ${s.quantity})">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                    <span>Edit Stock</span>
                 </button>
             </td>
         </tr>
@@ -2708,16 +2893,19 @@ function renderEmergencyPharmacies(list) {
                 <span class="status-pill status-verified" style="font-size:0.7rem;">${p.distanceKm} KM Away</span>
             </div>
             <div style="margin:12px 0;">
-                <span class="status-pill ${p.is24Hours ? 'status-uploaded' : 'status-extracted'}">
-                    ${p.is24Hours ? '🕒 Open 24 Hours (Emergency Ready)' : '🕒 Regular Hours'}
+                <span class="status-pill ${p.is24Hours ? 'status-uploaded' : 'status-extracted'}" style="display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>${p.is24Hours ? 'Open 24 Hours (Emergency Ready)' : 'Regular Hours'}</span>
                 </span>
             </div>
             <div style="display:flex; gap:8px;">
-                <a href="tel:${p.phone}" class="btn btn-primary" style="flex:1; text-align:center; text-decoration:none;">
-                    📞 Call ${p.phone}
+                <a href="tel:${p.phone}" class="btn btn-primary" style="flex:1; text-align:center; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span>Call ${p.phone}</span>
                 </a>
-                <button class="btn btn-secondary" onclick="switchTab('chat'); showToast('Connecting to pharmacist at ${p.name}...');">
-                    💬 Chat
+                <button class="btn btn-secondary" onclick="switchTab('chat'); showToast('Connecting to pharmacist at ${p.name}...');" style="display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Chat</span>
                 </button>
             </div>
         </div>
@@ -2757,7 +2945,7 @@ async function verifyMedicineCode() {
         if (data.isAuthentic) {
             resultBox.innerHTML = `
                 <div style="background:#ecfdf5; border:1px solid #a7f3d0; padding:20px; border-radius:12px;">
-                    <h3 style="color:#065f46;">✅ GENUINE AUTHENTIC PRODUCT</h3>
+                    <h3 style="color:#065f46; display:flex; align-items:center; gap:8px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg> GENUINE AUTHENTIC PRODUCT</h3>
                     <p style="margin-top:6px; color:#047857;">${data.details}</p>
                     <small style="display:block; margin-top:8px; color:#065f46;">Manufacturer: <strong>${data.manufacturer}</strong></small>
                 </div>
@@ -2765,7 +2953,7 @@ async function verifyMedicineCode() {
         } else {
             resultBox.innerHTML = `
                 <div style="background:#fee2e2; border:1px solid #fca5a5; padding:20px; border-radius:12px;">
-                    <h3 style="color:#991b1b;">⚠️ COUNTERFEIT / SUSPICIOUS MEDICINE</h3>
+                    <h3 style="color:#991b1b; display:flex; align-items:center; gap:8px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg> COUNTERFEIT / SUSPICIOUS MEDICINE</h3>
                     <p style="margin-top:6px; color:#b91c1c;">${data.details}</p>
                     <small style="display:block; margin-top:8px; color:#991b1b;">Report Source: <strong>${data.manufacturer}</strong></small>
                 </div>
@@ -2894,14 +3082,22 @@ function renderReminders() {
             dashContainer.innerHTML = allList.slice(0, 5).map(r => `
                 <div class="dash-rem-item">
                     <div class="dash-rem-left">
-                        <span class="rem-icon-pill">💊</span>
+                        <span class="rem-icon-pill">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                                <path d="m8.5 8.5 7 7"/>
+                            </svg>
+                        </span>
                         <div>
                             <strong>${escapeHtml(r.medicine)} (${escapeHtml(r.dosage)})</strong>
-                            <small>🕒 ${escapeHtml(r.time)} • ${escapeHtml(r.mealTiming || 'After Meal')} • ${escapeHtml(r.instructions || '')}</small>
+                            <small>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:3px; opacity:0.8;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                ${escapeHtml(r.time)} • ${escapeHtml(r.mealTiming || 'After Meal')} • ${escapeHtml(r.instructions || '')}
+                            </small>
                         </div>
                     </div>
                     <span class="rem-status-pill ${r.isTakenToday ? 'rem-taken' : 'rem-pending'}" onclick="handleTakeDose('${r.id}')" style="cursor:pointer;" title="Click to log dose">
-                        ${r.isTakenToday ? '✓ Taken' : 'Due Today'}
+                        ${r.isTakenToday ? '<span style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Taken</span>' : 'Due Today'}
                     </span>
                 </div>
             `).join('');
@@ -2913,13 +3109,13 @@ function renderReminders() {
     if (allList.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 48px 16px; background: var(--card-bg, #ffffff); border: 1px dashed var(--border-color, #cbd5e1); border-radius: 12px;">
-                <div style="font-size: 2.2rem; margin-bottom: 8px;">💊</div>
+                <div style="display:flex; justify-content:center; margin-bottom: 12px; color:var(--primary-blue);"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></div>
                 <h3 style="margin-bottom: 6px;">No Medication Reminders Scheduled</h3>
                 <p class="text-muted" style="font-size: 0.9rem; max-width: 420px; margin: 0 auto 16px auto;">
                     Keep your treatment on track. You can add a custom reminder or automatically generate dose schedules from your medical prescriptions.
                 </p>
                 <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
-                    <button class="btn btn-sync-rx" onclick="handleSyncFromPrescriptions()">⚡ Sync from Prescriptions</button>
+                    <button class="btn btn-sync-rx" onclick="handleSyncFromPrescriptions()" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Sync from Prescriptions</span></button>
                     <button class="btn btn-primary" onclick="openReminderModal()">+ Add Reminder</button>
                 </div>
             </div>
@@ -2968,11 +3164,11 @@ function renderReminders() {
             formattedTime = `${h.toString().padStart(2, '0')}:${m}`;
         }
 
-        let mealLabel = '🍽️ After Meal';
-        if (r.mealTiming === 'BEFORE_MEAL') mealLabel = '🥣 30m Before Meal';
-        else if (r.mealTiming === 'WITH_MEAL') mealLabel = '🥗 With Food';
-        else if (r.mealTiming === 'EMPTY_STOMACH') mealLabel = '💧 Empty Stomach';
-        else if (r.mealTiming === 'BEDTIME') mealLabel = '🌙 At Bedtime';
+        let mealLabel = 'After Meal';
+        if (r.mealTiming === 'BEFORE_MEAL') mealLabel = '30m Before Meal';
+        else if (r.mealTiming === 'WITH_MEAL') mealLabel = 'With Food';
+        else if (r.mealTiming === 'EMPTY_STOMACH') mealLabel = 'Empty Stomach';
+        else if (r.mealTiming === 'BEDTIME') mealLabel = 'At Bedtime';
 
         let cardStatusClass = '';
         if (isTaken) cardStatusClass = 'is-taken';
@@ -2991,7 +3187,7 @@ function renderReminders() {
                             <strong>${escapeHtml(r.medicine)}</strong>
                             <span class="rem-dosage-tag">${escapeHtml(r.dosage)}</span>
                             <span class="rem-meal-tag">${escapeHtml(mealLabel)}</span>
-                            ${isTaken ? `<span class="rem-taken-timestamp">✓ Taken Today</span>` : ''}
+                            ${isTaken ? `<span class="rem-taken-timestamp" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Taken Today</span>` : ''}
                             ${isPaused ? `<span class="badge badge-secondary" style="font-size:0.7rem;">PAUSED</span>` : ''}
                         </div>
                         <div class="rem-instructions-text">
@@ -3005,17 +3201,20 @@ function renderReminders() {
 
                 <div class="rem-card-actions">
                     ${!isTaken ? `
-                        <button type="button" class="btn-take-dose" onclick="handleTakeDose('${r.id}')" title="Log this dose as taken today">
-                            ✓ Take Dose
+                        <button type="button" class="btn-take-dose" onclick="handleTakeDose('${r.id}')" title="Log this dose as taken today" style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span>Take Dose</span>
                         </button>
                     ` : `
-                        <button type="button" class="btn-dose-taken" onclick="handleTakeDose('${r.id}')" title="Dose logged. Click to unmark.">
-                            ✓ Taken
+                        <button type="button" class="btn-dose-taken" onclick="handleTakeDose('${r.id}')" title="Dose logged. Click to unmark." style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span>Taken</span>
                         </button>
                     `}
 
-                    <button type="button" class="btn-snooze-dose" onclick="handleSnooze('${r.id}', 15)" title="Snooze reminder for 15 minutes">
-                        ⏰ +15m
+                    <button type="button" class="btn-snooze-dose" onclick="handleSnooze('${r.id}', 15)" title="Snooze reminder for 15 minutes" style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="m5 3 4 3"/><path d="m19 3-4 3"/></svg>
+                        <span>+15m</span>
                     </button>
 
                     <label class="rem-toggle-switch" title="${r.active ? 'Active schedule - click to pause' : 'Paused - click to resume'}">
@@ -3023,8 +3222,8 @@ function renderReminders() {
                         <span class="rem-toggle-slider"></span>
                     </label>
 
-                    <button type="button" class="btn-rem-delete" onclick="handleDeleteReminder('${r.id}')" title="Delete this reminder">
-                        🗑️
+                    <button type="button" class="btn-rem-delete" onclick="handleDeleteReminder('${r.id}')" title="Delete this reminder" style="display:inline-flex; align-items:center; justify-content:center; padding:4px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
                     </button>
                 </div>
             </div>
@@ -3209,7 +3408,7 @@ function openAlarmModal(alarmContent) {
 
     let medName = 'Napa Extra 500mg';
     let dosage = '1 Tablet';
-    let instr = '🍽️ Take after lunch with a full glass of water.';
+    let instr = 'Take after lunch with a full glass of water.';
 
     if (alarmContent && typeof alarmContent === 'string') {
         if (alarmContent.includes('take')) {
@@ -3365,7 +3564,7 @@ function renderConversationsSidebar() {
     if (conversations.length === 0) {
         listEl.innerHTML = `
             <div style="padding: 24px 16px; text-align: center; color: var(--text-muted, #94a3b8); font-size: 0.85rem;">
-                <div style="font-size: 1.6rem; margin-bottom: 8px;">💬</div>
+                <div style="display:flex; justify-content:center; margin-bottom: 8px; color:var(--primary-blue);"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
                 No active conversations yet.<br>
                 <small>${currentRole === 'PHARMACIST' ? 'Incoming patient consultations will appear here.' : 'Verified pharmacists will appear here.'}</small>
             </div>
@@ -3379,7 +3578,9 @@ function renderConversationsSidebar() {
         const isActive = c.partnerId === currentPartnerId;
         const snippet = c.lastMessage || (c.partnerRole === 'PHARMACIST' ? 'Ready for clinical consultation' : 'Patient consultation');
         const roleBadge = c.partnerRole === 'PHARMACIST' ? 'DGDA' : 'PATIENT';
-        const avatar = c.avatar || (c.partnerRole === 'PHARMACIST' ? '🩺' : '👤');
+        const avatarSvg = (c.partnerRole === 'PHARMACIST')
+            ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-blue, #1d4ed8);"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>`
+            : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
 
         let storeOrId = '';
         if (c.partnerRole === 'PHARMACIST') {
@@ -3403,9 +3604,9 @@ function renderConversationsSidebar() {
         }
 
         return `
-            <div class="chat-thread-card ${isActive ? 'active' : ''}" onclick="selectConversation('${escapeHtml(c.partnerId)}', '${escapeHtml(c.partnerName)}', '${escapeHtml(c.partnerRole)}', '${escapeHtml(c.partnerEmail || '')}', '${escapeHtml(avatar)}', '${escapeHtml(c.pharmacy || '')}', '${escapeHtml(c.license || '')}')">
+            <div class="chat-thread-card ${isActive ? 'active' : ''}" onclick="selectConversation('${escapeHtml(c.partnerId)}', '${escapeHtml(c.partnerName)}', '${escapeHtml(c.partnerRole)}', '${escapeHtml(c.partnerEmail || '')}', '', '${escapeHtml(c.pharmacy || '')}', '${escapeHtml(c.license || '')}')">
                 <div class="chat-thread-avatar-wrap">
-                    <div class="chat-thread-avatar">${avatar}</div>
+                    <div class="chat-thread-avatar" style="display:flex; align-items:center; justify-content:center;">${avatarSvg}</div>
                     <span class="chat-thread-online-dot"></span>
                 </div>
                 <div class="chat-thread-info">
@@ -3437,7 +3638,7 @@ function selectConversation(partnerId, partnerName, partnerRole, partnerEmail, p
         name: partnerName || (partnerRole === 'PHARMACIST' ? 'Dr. Pharmacist' : 'Patient'),
         role: partnerRole || 'PATIENT',
         email: partnerEmail || '',
-        avatar: partnerAvatar || (partnerRole === 'PHARMACIST' ? '🩺' : '👤'),
+        avatar: partnerAvatar || '',
         pharmacy: partnerStore || '',
         license: partnerLicense || ''
     };
@@ -3491,7 +3692,7 @@ function selectPharmacistConversation(pharmaId) {
             pharma.license
         );
     } else {
-        selectConversation(pharmaId, pharmaId === 'usr_pharma_02' ? 'Dr. Nazmul Huda' : 'Dr. Farhan Kabir', 'PHARMACIST', '', '🩺', '', '');
+        selectConversation(pharmaId, pharmaId === 'usr_pharma_02' ? 'Dr. Nazmul Huda' : 'Dr. Farhan Kabir', 'PHARMACIST', '', '', '', '');
     }
 }
 
@@ -3500,7 +3701,7 @@ function updateActiveChatHeader() {
         id: 'usr_pharma_01',
         name: 'Dr. Farhan Kabir',
         role: 'PHARMACIST',
-        avatar: '🩺',
+        avatar: '',
         pharmacy: 'Lazz Pharma (Dhanmondi Branch)',
         license: 'DGDA-PH-9920'
     };
@@ -3513,7 +3714,11 @@ function updateActiveChatHeader() {
     const typingTextEl = document.getElementById('chat-typing-text');
     const inputEl = document.getElementById('chat-input');
 
-    if (avatarEl) avatarEl.textContent = partner.avatar || (partner.role === 'PHARMACIST' ? '🩺' : '👤');
+    if (avatarEl) {
+        avatarEl.innerHTML = (partner.role === 'PHARMACIST')
+            ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-blue, #1d4ed8);"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>`
+            : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+    }
     if (nameEl) nameEl.textContent = partner.name;
 
     if (roleBadgeEl) {
@@ -3559,34 +3764,48 @@ function renderChatQuickChips() {
 
     if (myRole === 'PHARMACIST') {
         container.innerHTML = `
-            <span class="chat-quick-chips-label">⚡ Clinical Responses:</span>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Take this medication 30 minutes before meals with a full glass of water.')">
-                💊 Before Meals (1+0+1)
+            <span class="chat-quick-chips-label" style="display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Clinical Responses:</span>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Take this medication 30 minutes before meals with a full glass of water.')" style="display:inline-flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-blue, #1d4ed8);">
+                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                    <path d="m8.5 8.5 7 7"/>
+                </svg>
+                <span>Before Meals (1+0+1)</span>
             </button>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Ensure at least a 4-hour gap between doses. Do not exceed the prescribed limit.')">
-                ⏱️ 4-Hour Dose Gap
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Ensure at least a 4-hour gap between doses. Do not exceed the prescribed limit.')" style="display:inline-flex; align-items:center; gap:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>4-Hour Dose Gap</span>
             </button>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Your prescription is verified and authentic stock is available at our pharmacy.')">
-                📋 Verified & In Stock
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Your prescription is verified and authentic stock is available at our pharmacy.')" style="display:inline-flex; align-items:center; gap:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                <span>Verified & In Stock</span>
             </button>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('If any dizziness, nausea, or allergic rash persists, discontinue and seek immediate clinical care.')">
-                ⚠️ Clinical Precaution
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('If any dizziness, nausea, or allergic rash persists, discontinue and seek immediate clinical care.')" style="display:inline-flex; align-items:center; gap:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <span>Clinical Precaution</span>
             </button>
         `;
     } else {
         container.innerHTML = `
-            <span class="chat-quick-chips-label">⚡ Quick Inquiries:</span>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Check drug interactions for my active medications.', true)">
-                💊 Check Interactions
+            <span class="chat-quick-chips-label" style="display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Quick Inquiries:</span>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Check drug interactions for my active medications.', true)" style="display:inline-flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-blue, #1d4ed8);">
+                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                    <path d="m8.5 8.5 7 7"/>
+                </svg>
+                <span>Check Interactions</span>
             </button>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('What is the optimal dosing time and meal schedule for my medicines?', true)">
-                ⏱️ Dosing &amp; Schedule
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('What is the optimal dosing time and meal schedule for my medicines?', true)" style="display:inline-flex; align-items:center; gap:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>Dosing & Schedule</span>
             </button>
-            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Are there any known adverse side effects or food precautions for these drugs?', true)">
-                ⚠️ Adverse Side Effects
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Are there any known adverse side effects or food precautions for these drugs?', true)" style="display:inline-flex; align-items:center; gap:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <span>Adverse Side Effects</span>
             </button>
-            <button type="button" class="chat-chip" onclick="openChatAttachRxModal()">
-                📎 Share Prescription
+            <button type="button" class="chat-chip" onclick="openChatAttachRxModal()" style="display:inline-flex; align-items:center; gap:5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <span>Share Prescription</span>
             </button>
         `;
     }
@@ -3625,7 +3844,7 @@ function renderChatMessages(list) {
         id: (currentRole === 'PHARMACIST') ? 'ML-9824-A' : 'usr_pharma_01',
         name: (currentRole === 'PHARMACIST') ? 'Rahim Ahmed' : 'Dr. Farhan Kabir',
         role: (currentRole === 'PHARMACIST') ? 'PATIENT' : 'PHARMACIST',
-        avatar: (currentRole === 'PHARMACIST') ? '👤' : '🩺',
+        avatar: '',
         pharmacy: 'Lazz Pharma (Dhanmondi Branch)',
         license: 'DGDA-PH-9920'
     };
@@ -3638,17 +3857,20 @@ function renderChatMessages(list) {
 
         const buttonsHtml = currentRole === 'PATIENT' ? `
             <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="sendQuickChatMessage('Assalamu Alaikum doctor, could you please review my medicine schedule?')">
-                    👋 Say Hello
+                <button type="button" class="btn btn-secondary btn-sm" onclick="sendQuickChatMessage('Assalamu Alaikum doctor, could you please review my medicine schedule?')" style="display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                    <span>Say Hello</span>
                 </button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="openChatAttachRxModal()">
-                    📎 Attach Prescription
+                <button type="button" class="btn btn-primary btn-sm" onclick="openChatAttachRxModal()" style="display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span>Attach Prescription</span>
                 </button>
             </div>
         ` : `
             <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
-                <button type="button" class="btn btn-primary btn-sm" onclick="sendQuickChatMessage('Assalamu Alaikum. How may I assist you with your medications today?')">
-                    👋 Start Consultation
+                <button type="button" class="btn btn-primary btn-sm" onclick="sendQuickChatMessage('Assalamu Alaikum. How may I assist you with your medications today?')" style="display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>Start Consultation</span>
                 </button>
             </div>
         `;
@@ -3699,12 +3921,30 @@ function renderChatMessages(list) {
             let pillsHtml = '';
             if (m.prescriptionSummary) {
                 const pills = m.prescriptionSummary.split(',').map(s => s.trim()).filter(Boolean);
-                pillsHtml = `<div class="chat-rx-pills">${pills.map(p => `<span class="chat-rx-pill-item">💊 ${escapeHtml(p)}</span>`).join('')}</div>`;
+                pillsHtml = `<div class="chat-rx-pills">${pills.map(p => `
+                    <span class="chat-rx-pill-item">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:3px;">
+                            <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                            <path d="m8.5 8.5 7 7"/>
+                        </svg>
+                        ${escapeHtml(p)}
+                    </span>
+                `).join('')}</div>`;
             }
             rxCardHtml = `
                 <div class="chat-rx-attachment-card">
                     <div class="chat-rx-header">
-                        <span>📋 Attached Rx: <strong>${escapeHtml(m.prescriptionId)}</strong></span>
+                        <span style="display:inline-flex; align-items:center; gap:5px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                                <path d="M12 11h4"/>
+                                <path d="M12 16h4"/>
+                                <path d="M8 11h.01"/>
+                                <path d="M8 16h.01"/>
+                            </svg>
+                            Attached Rx: <strong>${escapeHtml(m.prescriptionId)}</strong>
+                        </span>
                         <span class="badge badge-success" style="font-size:0.68rem; padding:1px 6px;">VERIFIED</span>
                     </div>
                     ${pillsHtml}
@@ -3713,7 +3953,9 @@ function renderChatMessages(list) {
         }
 
         const senderLabel = isMine ? (m.senderName || 'You') : (m.senderName || (m.senderRole === 'PHARMACIST' ? 'Pharmacist' : 'Patient'));
-        const roleBadge = m.senderRole === 'PHARMACIST' ? '🩺 DGDA Pharmacist' : '👤 Patient';
+        const roleBadge = m.senderRole === 'PHARMACIST'
+            ? '<span style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>DGDA Pharmacist</span>'
+            : '<span style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Patient</span>';
 
         return `
             <div class="chat-msg ${isMine ? 'mine' : 'theirs'}">
@@ -3890,10 +4132,17 @@ function attachPrescriptionToChat(rxId) {
 }
 
 // Help Center Knowledge Base & Interactive Handlers
+const HELP_CATEGORY_SVGS = {
+    'Getting Started': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>`,
+    'Prescription OCR': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>`,
+    'Security & Privacy': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`,
+    'Emergency Mode': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12a5 5 0 0 1 5-5v0a5 5 0 0 1 5 5v6H7v-6z"/><path d="M5 20a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5v-2z"/><path d="M12 2v3"/><path d="m4.93 4.93 2.12 2.12"/><path d="m19.07 4.93-2.12 2.12"/></svg>`,
+    'Help Guide': `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`
+};
+
 const HELP_ARTICLES_DATA = {
     'Creating your account': {
         category: 'Getting Started',
-        icon: '🚀',
         content: `
             <p><strong>1. Click 'Sign Up' in the Patient Portal:</strong> Enter your full name, email, role (Patient, Pharmacist, or Admin), and password.</p>
             <p><strong>2. Unique Patient ID:</strong> A clinical ID formatted as <code>PA-XXXX-Y</code> is automatically assigned to your account.</p>
@@ -3902,7 +4151,6 @@ const HELP_ARTICLES_DATA = {
     },
     'Navigating the Patient Portal': {
         category: 'Getting Started',
-        icon: '🧭',
         content: `
             <p><strong>• Dashboard:</strong> View daily medicine schedules, active prescriptions, and stock notifications.</p>
             <p><strong>• Prescriptions & Meds:</strong> Upload prescriptions for instant OCR parsing and find generic drug alternatives.</p>
@@ -3912,7 +4160,6 @@ const HELP_ARTICLES_DATA = {
     },
     'Updating your profile info': {
         category: 'Getting Started',
-        icon: '⚙️',
         content: `
             <p><strong>• Personal Details:</strong> Navigate to <strong>Settings</strong> to update your first name, last name, date of birth, phone number, and gender.</p>
             <p><strong>• Medical ID:</strong> Click <strong>+ Edit Medical Data</strong> to customize your blood group, known allergies, and chronic conditions with color-coded badge pills.</p>
@@ -3921,7 +4168,6 @@ const HELP_ARTICLES_DATA = {
     },
     'Getting Started Guide': {
         category: 'Getting Started',
-        icon: '🚀',
         content: `
             <p>Welcome to <strong>MediLink</strong>! MediLink is a next-generation healthcare platform that connects patients, licensed pharmacists, and clinical administrators.</p>
             <p>Start by uploading your first prescription or exploring medicine alternatives to optimize your healthcare journey.</p>
@@ -3929,7 +4175,6 @@ const HELP_ARTICLES_DATA = {
     },
     'How to scan a label': {
         category: 'Prescription OCR',
-        icon: '🔲',
         content: `
             <p><strong>1. Clear Lighting:</strong> Ensure the doctor's handwriting or printed label is well-lit and unobstructed.</p>
             <p><strong>2. Click 'Upload Prescription':</strong> Located at the top right of the navigation header or inside the Prescriptions tab.</p>
@@ -3938,7 +4183,6 @@ const HELP_ARTICLES_DATA = {
     },
     'Fixing scanning errors': {
         category: 'Prescription OCR',
-        icon: '🔧',
         content: `
             <p><strong>• Blurry Images:</strong> Re-upload with a higher resolution camera or straighten the camera angle.</p>
             <p><strong>• Unrecognized Medicine:</strong> If a brand is uncommon, our system will cross-reference the DGDA database for generic chemical matches (e.g. Paracetamol for Napa Extra).</p>
@@ -3947,7 +4191,6 @@ const HELP_ARTICLES_DATA = {
     },
     'Supported prescription formats': {
         category: 'Prescription OCR',
-        icon: '📄',
         content: `
             <p><strong>• Supported File Types:</strong> JPEG, PNG, WEBP, and PDF documents.</p>
             <p><strong>• Handwritten Prescriptions:</strong> Supported via AI multi-layer OCR parsing.</p>
@@ -3956,14 +4199,12 @@ const HELP_ARTICLES_DATA = {
     },
     'Prescription OCR Guide': {
         category: 'Prescription OCR',
-        icon: '🔲',
         content: `
             <p>MediLink's <strong>Prescription OCR & Generic Matcher</strong> utilizes advanced optical character recognition combined with Bangladesh DGDA generic formulas to extract dosages and find cost-effective alternatives.</p>
         `
     },
     'Data encryption standards': {
         category: 'Security & Privacy',
-        icon: '🛡️',
         content: `
             <p><strong>• 256-Bit AES Encryption:</strong> All patient records, prescription history, and emergency telemetry are encrypted in transit and at rest.</p>
             <p><strong>• Secure SSE Streaming:</strong> Real-time reminder alarms and stock broadcasts use authenticated TLS channels.</p>
@@ -3971,7 +4212,6 @@ const HELP_ARTICLES_DATA = {
     },
     'Managing app permissions': {
         category: 'Security & Privacy',
-        icon: '🔒',
         content: `
             <p><strong>• Role-Based Access Control (RBAC):</strong> Patients, Pharmacists, and Administrators have strictly separated privileges.</p>
             <p><strong>• Privacy First:</strong> Your medical data is only shared with emergency responders when you trigger Emergency Mode.</p>
@@ -3979,21 +4219,18 @@ const HELP_ARTICLES_DATA = {
     },
     'HIPAA compliance overview': {
         category: 'Security & Privacy',
-        icon: '📋',
         content: `
             <p>MediLink complies with international HIPAA and local health ministry guidelines regarding Electronic Protected Health Information (ePHI) retention and audit logging.</p>
         `
     },
     'Security & Privacy': {
         category: 'Security & Privacy',
-        icon: '🛡️',
         content: `
             <p>Your privacy and medical confidentiality are our highest priority. MediLink implements stringent end-to-end encryption across all patient records and pharmacist communications.</p>
         `
     },
     'Activating Emergency Protocols': {
         category: 'Emergency Mode',
-        icon: '🚨',
         content: `
             <p><strong>1. Press 'Emergency Mode' in the Sidebar:</strong> Triggers instantaneous high-priority red alert mode.</p>
             <p><strong>2. Nearby Pharmacy Alert:</strong> Broadcasts your location and required emergency medicines (e.g. Salbutamol Inhaler, Epinephrine, Nitroglycerin) to nearby 24/7 pharmacies within 5km.</p>
@@ -4002,21 +4239,18 @@ const HELP_ARTICLES_DATA = {
     },
     'Sharing data with EMTs': {
         category: 'Emergency Mode',
-        icon: '🚑',
         content: `
             <p>When Emergency Mode is engaged, paramedics and first responders can scan your patient QR/NFC tag to view your vital <strong>Medical ID</strong>: Blood Type, Severe Allergies (e.g. Penicillin), and Chronic Conditions (e.g. Asthma).</p>
         `
     },
     'Emergency contacts setup': {
         category: 'Emergency Mode',
-        icon: '📞',
         content: `
             <p>Go to <strong>Settings ➔ Emergency Contacts</strong> and click <strong>⊕ Add Contact</strong>. You can add family members, spouses, parents, or your primary care doctor with phone numbers.</p>
         `
     },
     'Emergency Mode Guide': {
         category: 'Emergency Mode',
-        icon: '🚨',
         content: `
             <p><strong>Emergency Mode</strong> is designed for acute medical situations, sudden asthma attacks, cardiac emergencies, or severe allergic reactions. It mobilizes nearby 24/7 pharmacies and shares your vital Medical ID with EMT responders.</p>
         `
@@ -4026,14 +4260,16 @@ const HELP_ARTICLES_DATA = {
 function openHelpArticle(title) {
     const article = HELP_ARTICLES_DATA[title] || {
         category: 'Help Guide',
-        icon: '📖',
         content: `<p>Detailed guidance for <strong>${escapeHtml(title)}</strong> is available. If you need immediate assistance, please connect with our 24/7 pharmacist support.</p>`
     };
 
     const titleEl = document.getElementById('help-modal-title');
     const bodyEl = document.getElementById('help-modal-body');
 
-    if (titleEl) titleEl.innerHTML = `${article.icon} ${title}`;
+    const catSvg = HELP_CATEGORY_SVGS[article.category] || HELP_CATEGORY_SVGS['Help Guide'];
+    if (titleEl) {
+        titleEl.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; color:var(--primary-blue); vertical-align:middle;">${catSvg}</span> <span>${escapeHtml(title)}</span>`;
+    }
     if (bodyEl) {
         bodyEl.innerHTML = `
             <div style="display:inline-block; padding:3px 10px; background:var(--primary-blue-light, #eff6ff); color:var(--primary-blue, #1d4ed8); font-size:0.78rem; font-weight:700; border-radius:9999px; margin-bottom:12px;">
@@ -4124,7 +4360,7 @@ function handleSupportAttachment(event) {
     const file = event.target.files && event.target.files[0];
     const filenameLabel = document.getElementById('support-attachment-filename');
     if (file && filenameLabel) {
-        filenameLabel.textContent = `📎 Attached: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        filenameLabel.innerHTML = `<span style="display:inline-flex; align-items:center; gap:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Attached: ${escapeHtml(file.name)} (${(file.size / 1024).toFixed(1)} KB)</span>`;
         filenameLabel.style.color = 'var(--primary-blue, #1d4ed8)';
         filenameLabel.style.fontWeight = '700';
     }
@@ -4262,7 +4498,7 @@ function renderNotifications() {
         // Completely empty state across all dropdowns
         const emptyHtml = `
             <div class="empty-notifs-box" style="padding: 46px 20px; text-align: center; color: #94a3b8; font-size: 0.85rem;">
-                <div style="font-size: 2.2rem; margin-bottom: 8px; opacity: 0.5;">🔔</div>
+                <div style="display:flex; justify-content:center; margin-bottom: 8px; color:var(--primary-blue); opacity:0.6;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
                 <p style="margin: 0; font-weight: 700; color: #64748b; font-size: 0.9rem;">No notifications</p>
                 <small style="color: #94a3b8; font-size: 0.78rem; display: block; margin-top: 4px; line-height: 1.4;">You have no new alerts. When you receive clinical notifications, they will appear here.</small>
             </div>
@@ -4274,9 +4510,11 @@ function renderNotifications() {
 
     footerElements.forEach(f => f.style.display = 'block');
 
+    const defaultNotifIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
+
     const itemsHtml = notifs.map((n, idx) => `
         <div class="notif-dropdown-item ${n.unread ? 'unread' : ''}" onclick="viewNotificationDetails('${escapeHtml(n.title)}', '${escapeHtml(n.text)}', ${idx})">
-            <div class="notif-item-icon">${n.icon || '🔔'}</div>
+            <div class="notif-item-icon">${(n.icon && n.icon.startsWith('<svg')) ? n.icon : defaultNotifIcon}</div>
             <div class="notif-item-content">
                 <p class="notif-item-text">${n.textHtml || escapeHtml(n.text)}</p>
                 <span class="notif-item-time">${escapeHtml(n.time || 'Just now')}</span>
@@ -4292,7 +4530,7 @@ function addNotification(notif) {
     if (!state.notifications) state.notifications = [];
     state.notifications.unshift({
         id: 'notif_' + Date.now(),
-        icon: notif.icon || '🔔',
+        icon: notif.icon || '',
         title: notif.title || 'Notification',
         text: notif.text || '',
         textHtml: notif.textHtml || notif.text || '',
@@ -4327,7 +4565,7 @@ function viewNotificationDetails(title, message, idx) {
     const titleEl = document.getElementById('help-modal-title');
     const bodyEl = document.getElementById('help-modal-body');
 
-    if (titleEl) titleEl.innerHTML = `🔔 ${escapeHtml(title)}`;
+    if (titleEl) titleEl.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; color:var(--primary-blue); vertical-align:middle;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span> <span>${escapeHtml(title)}</span>`;
     if (bodyEl) {
         bodyEl.innerHTML = `
             <div style="padding:12px 16px; background:var(--primary-blue-surface, #f0f7ff); border-left:4px solid var(--primary-blue, #1d4ed8); border-radius:6px; margin-bottom:14px;">
@@ -4478,7 +4716,7 @@ async function processUploadedPrescriptionFile(file) {
             if (emptyState) {
                 emptyState.style.display = 'block';
                 emptyState.innerHTML = `
-                    <div style="font-size:2.8rem; margin-bottom:8px;">⚠️</div>
+                    <div style="display:flex; justify-content:center; margin-bottom:12px; color:#ef4444;"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></div>
                     <p style="color:#ef4444; font-weight:800; font-size:0.95rem; margin:0 0 6px;">No Prescription Detected</p>
                     <small style="color:#64748b; line-height:1.45; display:block;">
                         The uploaded image (<strong>${escapeHtml(file.name)}</strong>) does not contain recognized medical prescriptions or drug dosages.<br>
@@ -4518,7 +4756,13 @@ async function processUploadedPrescriptionFile(file) {
             itemsList.innerHTML = result.items.map(item => `
                 <div class="detected-med-item">
                     <div class="detected-med-top">
-                        <span class="detected-med-name">💊 ${escapeHtml(item.name)}</span>
+                        <span class="detected-med-name">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px; color:var(--primary-blue, #1d4ed8);">
+                                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                                <path d="m8.5 8.5 7 7"/>
+                            </svg>
+                            ${escapeHtml(item.name)}
+                        </span>
                         <span class="detected-med-strength">(${escapeHtml(item.strength)})</span>
                     </div>
                     <p class="detected-med-freq">${escapeHtml(item.freq)}</p>
@@ -4725,7 +4969,7 @@ async function confirmAndAddRxToHistory() {
             
             // Add notification
             addNotification({
-                icon: '📋',
+                icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>',
                 title: 'New Prescription Added',
                 text: `Prescription #${data.prescriptionId} scanned and added to your history.`,
                 time: 'Just now'
@@ -4874,9 +5118,9 @@ function saveGeminiApiKey() {
 
     // Minimum length check only — let the server validate with Gemini
     if (rawKey.length < 10) {
-        if (statusEl) statusEl.innerHTML = '<span style="color:#ef4444;">❌ Key too short — please paste the full API key</span>';
+        if (statusEl) statusEl.innerHTML = '<span style="color:#ef4444; display:inline-flex; align-items:center; gap:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>Key too short — please paste the full API key</span>';
         if (input) { input.style.borderColor = '#ef4444'; input.focus(); }
-        showToast('❌ Key too short. Please paste the complete API key.');
+        showToast('Key too short. Please paste the complete API key.');
         return;
     }
 
@@ -5023,7 +5267,7 @@ function renderAllAiMessages() {
         if (!aiChatState.history || aiChatState.history.length === 0) {
             box.innerHTML = `
                 <div class="ai-msg-row ai">
-                    <div class="ai-bubble-avatar">🤖</div>
+                    <div class="ai-bubble-avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></div>
                     <div>
                         <div class="ai-bubble">
                             <strong>Hello! I am MediLink.</strong><br>
@@ -5042,11 +5286,17 @@ function renderAllAiMessages() {
         aiChatState.history.forEach(msg => {
             const isUser = msg.role === 'user';
             const formattedContent = formatAiMarkdown(msg.content);
-            const providerTag = (!isUser && msg.provider === 'GEMINI_AI') ? '✨ Gemini AI' : (!isUser ? '🩺 Clinical Engine' : 'You');
+            const providerTag = (!isUser && msg.provider === 'GEMINI_AI')
+                ? '<span style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Gemini AI</span>'
+                : (!isUser ? '<span style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>Clinical Engine</span>' : 'You');
+
+            const avatarSvg = isUser
+                ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+                : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`;
 
             html += `
                 <div class="ai-msg-row ${isUser ? 'user' : 'ai'}">
-                    <div class="ai-bubble-avatar">${isUser ? '👤' : '🤖'}</div>
+                    <div class="ai-bubble-avatar">${avatarSvg}</div>
                     <div>
                         <div class="ai-bubble">
                             ${formattedContent}
@@ -5195,7 +5445,9 @@ function applyTheme(themeName, animate = true) {
     // Update Floating Dock Label
     const dockLabel = document.getElementById('floating-theme-label');
     if (dockLabel) {
-        dockLabel.textContent = isDark ? '🌙 Dark' : '☀️ Light';
+        dockLabel.innerHTML = isDark
+            ? `<span style="display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>Dark</span>`
+            : `<span style="display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>Light</span>`;
     }
 
     // Update Settings Cards if present
@@ -5351,13 +5603,13 @@ function renderAdminUsersTable(users) {
     tbody.innerHTML = users.map(u => {
         const role = (u.role || 'PATIENT').toUpperCase();
         let roleBadgeClass = 'badge-patient';
-        let roleEmoji = '👤';
+        let roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
         if (role === 'PHARMACIST') {
             roleBadgeClass = 'badge-pharmacist';
-            roleEmoji = '🩺';
+            roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>`;
         } else if (role === 'ADMIN') {
             roleBadgeClass = 'badge-admin';
-            roleEmoji = '🛡️';
+            roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
         }
 
         const contact = u.phone || u.email || 'None';
@@ -5368,7 +5620,7 @@ function renderAdminUsersTable(users) {
                 <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(u.id || '')}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:1.4rem;">${roleEmoji}</span>
+                        <span style="display:flex; align-items:center; color:var(--primary-blue);">${roleSvg}</span>
                         <div>
                             <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(u.name || 'Unnamed')}</strong>
                             <small style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(u.email || '')}</small>
@@ -5377,7 +5629,7 @@ function renderAdminUsersTable(users) {
                 </td>
                 <td><span class="user-role-pill ${roleBadgeClass}">${role}</span></td>
                 <td>
-                    <div style="font-size:0.85rem;">📞 ${escapeHtml(contact)}</div>
+                    <div style="font-size:0.85rem; display:flex; align-items:center; gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span>${escapeHtml(contact)}</span></div>
                     <small style="color:var(--text-muted);">${escapeHtml(address)}</small>
                 </td>
                 <td>
@@ -5387,8 +5639,8 @@ function renderAdminUsersTable(users) {
                 </td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <button type="button" class="btn-action-edit" onclick="openAdminEditUserModal('${u.id}')" title="Edit User">✏️ Edit</button>
-                        <button type="button" class="btn-action-delete" onclick="deleteAdminUser('${u.id}', '${escapeHtml(u.name)}')" title="Delete User">🗑️ Delete</button>
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditUserModal('${u.id}')" title="Edit User" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Edit</span></button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminUser('${u.id}', '${escapeHtml(u.name)}')" title="Delete User" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span>Delete</span></button>
                     </div>
                 </td>
             </tr>
@@ -5657,11 +5909,11 @@ function renderAdminPharmaciesTable(pharmacies) {
 
     tbody.innerHTML = pharmacies.map(p => {
         const is24hBadge = p.is24Hours
-            ? '<span class="badge-24h">✓ 24/7 Open</span>'
+            ? '<span class="badge-24h" style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>24/7 Open</span>'
             : '<span class="badge-standard-hours">Standard Hours</span>';
 
         const emergencyBadge = p.hasEmergencyDelivery
-            ? '<span class="badge-emergency-yes">⚡ Active</span>'
+            ? '<span class="badge-emergency-yes" style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Active</span>'
             : '<span class="badge-emergency-no">Standard</span>';
 
         const stockSkus = p.stockCount !== undefined ? p.stockCount : 0;
@@ -5671,22 +5923,22 @@ function renderAdminPharmaciesTable(pharmacies) {
                 <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(p.id || '')}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:1.3rem;">🏥</span>
+                        <span style="display:flex; align-items:center; color:var(--primary-blue);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>
                         <div>
                             <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(p.name || 'Unnamed')}</strong>
-                            <small style="color:var(--primary-blue); font-weight:700; font-size:0.78rem;">📍 ${escapeHtml(p.area || 'Dhaka')}</small>
+                            <small style="color:var(--primary-blue); font-weight:700; font-size:0.78rem; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(p.area || 'Dhaka')}</small>
                         </div>
                     </div>
                 </td>
                 <td style="max-width:240px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(p.address || '')}</td>
-                <td><span style="font-size:0.85rem; font-weight:600;">📞 ${escapeHtml(p.phone || 'N/A')}</span></td>
+                <td><span style="font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>${escapeHtml(p.phone || 'N/A')}</span></td>
                 <td>${is24hBadge}</td>
                 <td>${emergencyBadge}</td>
                 <td><span class="badge-tag" style="font-weight:700;">${stockSkus} SKUs</span></td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <button type="button" class="btn-action-edit" onclick="openAdminEditPharmacyModal('${p.id}')" title="Edit Pharmacy">✏️ Edit</button>
-                        <button type="button" class="btn-action-delete" onclick="deleteAdminPharmacy('${p.id}', '${escapeHtml(p.name)}')" title="Delete Pharmacy">🗑️ Delete</button>
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditPharmacyModal('${p.id}')" title="Edit Pharmacy" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Edit</span></button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminPharmacy('${p.id}', '${escapeHtml(p.name)}')" title="Delete Pharmacy" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span>Delete</span></button>
                     </div>
                 </td>
             </tr>
@@ -5889,8 +6141,8 @@ function renderAdminMedicinesTable(meds) {
                 <td>${rxRequired}</td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <button type="button" class="btn-action-edit" onclick="openAdminEditMedicineModal('${m.id}')" title="Edit Medicine">✏️ Edit</button>
-                        <button type="button" class="btn-action-delete" onclick="deleteAdminMedicine('${m.id}', '${escapeHtml(m.brandName)}')" title="Delete Medicine">🗑️ Delete</button>
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditMedicineModal('${m.id}')" title="Edit Medicine" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Edit</span></button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminMedicine('${m.id}', '${escapeHtml(m.brandName)}')" title="Delete Medicine" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span>Delete</span></button>
                     </div>
                 </td>
             </tr>
@@ -6066,9 +6318,9 @@ function renderAdminPrescriptionsTable(rxList) {
     tbody.innerHTML = rxList.map(rx => {
         const status = (rx.status || 'UPLOADED').toUpperCase();
         let statusBadge = `<span class="status-badge badge-warning">Pending (${status})</span>`;
-        if (status === 'VERIFIED') statusBadge = '<span class="status-badge badge-success">✓ Verified Genuine</span>';
-        else if (status === 'DISPENSED') statusBadge = '<span class="status-badge badge-info">📦 Dispensed</span>';
-        else if (status === 'REJECTED') statusBadge = '<span class="status-badge badge-danger">✕ Flagged / Rejected</span>';
+        if (status === 'VERIFIED') statusBadge = '<span class="status-badge badge-success" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Verified Genuine</span>';
+        else if (status === 'DISPENSED') statusBadge = '<span class="status-badge badge-info" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>Dispensed</span>';
+        else if (status === 'REJECTED') statusBadge = '<span class="status-badge badge-danger" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Flagged / Rejected</span>';
 
         const itemsCount = (rx.items && Array.isArray(rx.items)) ? rx.items.length : 0;
         const itemsText = itemsCount > 0
@@ -6252,7 +6504,9 @@ function handleLivePriceUpdateEvent(raw) {
 
     const isIncrease = newPrice >= oldPrice;
     const flashClass = isIncrease ? 'price-flash-up' : 'price-flash-down';
-    const directionIcon = isIncrease ? '📈' : '📉';
+    const directionIconSvg = isIncrease
+        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`
+        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>`;
 
     priceElements.forEach(el => {
         el.textContent = `BDT ${newPrice.toFixed(2)}`;
@@ -6286,10 +6540,10 @@ function handleLivePriceUpdateEvent(raw) {
     }
 
     // 5. User Notification Toast & Bell Feed
-    const toastMsg = `${directionIcon} Market Price Alert: ${brandName} price updated to ৳${newPrice.toFixed(2)} (${pct}%) via ${source}`;
+    const toastMsg = `Market Price Alert: ${brandName} price updated to ৳${newPrice.toFixed(2)} (${pct}%) via ${source}`;
     showToast(toastMsg);
     addNotification({
-        icon: directionIcon,
+        icon: directionIconSvg,
         title: `Market MRP: ${brandName}`,
         text: `Official market price updated from ৳${oldPrice.toFixed(2)} to ৳${newPrice.toFixed(2)} (${pct}%). Source: ${source}.`,
         time: 'Just now'
@@ -6336,9 +6590,9 @@ async function loadMarketPriceData() {
             const systemPrice = localMed ? `৳${localMed.unitPrice.toFixed(2)}` : '<span style="color:#94a3b8;">Not in catalog</span>';
             const isSynced = localMed && Math.abs(localMed.unitPrice - item.mrp) < 0.01;
             const statusBadge = isSynced 
-                ? '<span style="background:#ecfdf5; color:#059669; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600;">✓ SYNCHRONIZED</span>'
+                ? '<span style="background:#ecfdf5; color:#059669; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>SYNCHRONIZED</span>'
                 : (localMed 
-                    ? '<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600;">⚠️ PENDING SYNC</span>'
+                    ? '<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>PENDING SYNC</span>'
                     : '<span style="background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:0.75rem;">UNTRACKED</span>');
 
             return `
@@ -6460,4 +6714,50 @@ async function simulateMarketPriceFluctuation() {
         showToast('❌ Simulation failed: ' + err.message);
     }
 }
+
+// ==========================================
+// Landing Page Enhancements: Mobile Nav & FAQ
+// ==========================================
+
+function toggleMobileMenu() {
+    const navLinks = document.getElementById('landing-nav-links');
+    if (!navLinks) return;
+    navLinks.classList.toggle('mobile-open');
+}
+window.toggleMobileMenu = toggleMobileMenu;
+
+document.addEventListener('click', (e) => {
+    if (e.target.closest('#landing-nav-links a')) {
+        const navLinks = document.getElementById('landing-nav-links');
+        if (navLinks && navLinks.classList.contains('mobile-open')) {
+            navLinks.classList.remove('mobile-open');
+        }
+    }
+});
+
+function toggleFaq(button) {
+    if (!button) return;
+    const faqItem = button.closest('.faq-item');
+    if (!faqItem) return;
+
+    const wasActive = faqItem.classList.contains('active');
+
+    // Close other open FAQ items for accordion flow
+    document.querySelectorAll('.faq-item.active').forEach(item => {
+        if (item !== faqItem) {
+            item.classList.remove('active');
+            const btn = item.querySelector('.faq-question');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    if (wasActive) {
+        faqItem.classList.remove('active');
+        button.setAttribute('aria-expanded', 'false');
+    } else {
+        faqItem.classList.add('active');
+        button.setAttribute('aria-expanded', 'true');
+    }
+}
+window.toggleFaq = toggleFaq;
 
