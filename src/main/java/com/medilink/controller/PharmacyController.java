@@ -78,7 +78,7 @@ public class PharmacyController {
         return ResponseEntity.ok(response);
     }
 
-    @RequestMapping(value = {"/stocks", "/stock"}, method = {RequestMethod.POST, RequestMethod.PUT})
+    @RequestMapping(value = {"/stocks", "/stock", "/stock/update", "/stocks/update"}, method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<Map<String, Object>> updateStock(@RequestBody Map<String, Object> body) {
         String stockId = (String) body.get("stockId");
         int quantity = 10;

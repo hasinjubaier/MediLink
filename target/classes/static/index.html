@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3.7">
+    <link rel="stylesheet" href="style.css?v=4.0">
     <!-- Immediate Theme Initialization to Prevent FOUC -->
     <script>
         (function() {
@@ -364,7 +364,7 @@
                         </p>
                     </div>
 
-                    <div class="feature-card feature-card-consult" onclick="handleAppointmentManagementClick()" title="Appointment Management System — Appointments & Doses">
+                    <div class="feature-card feature-card-consult" onclick="handleMedicationRemindersClick()" title="Medication Reminders & Dose Scheduler">
                         <div class="feature-icon-wrapper">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -373,9 +373,9 @@
                                 <line x1="3" y1="10" x2="21" y2="10"/>
                             </svg>
                         </div>
-                        <h3 class="feature-title">Appointment Management System</h3>
+                        <h3 class="feature-title">Medication Reminders & Dose Scheduler</h3>
                         <p class="feature-description">
-                            Schedule pharmacist consultations, track upcoming appointments, manage doses, and receive automated reminders.
+                            Track daily intake, manage prescription dose schedules, log taken medicines, and receive automated smart reminders.
                         </p>
                     </div>
 
@@ -744,6 +744,10 @@
         <div class="app-layout">
             <aside class="sidebar">
                 <nav class="nav-menu">
+                    <button class="nav-btn" onclick="switchTab('admin')" id="tab-btn-admin" style="display:none;">
+                        <span class="nav-icon">📊</span>
+                        <span>Admin Dashboard</span>
+                    </button>
                     <button class="nav-btn active" onclick="switchTab('dashboard')" id="tab-btn-dashboard">
                         <span class="nav-icon">⊞</span>
                         <span>Dashboard</span>
@@ -757,8 +761,8 @@
                         <span>Prescriptions & Meds</span>
                     </button>
                     <button class="nav-btn" onclick="switchTab('reminders')" id="tab-btn-reminders">
-                        <span class="nav-icon">📅</span>
-                        <span>Appointments & Doses</span>
+                        <span class="nav-icon">⏰</span>
+                        <span id="tab-btn-reminders-label">Medication Reminders</span>
                     </button>
                     <button class="nav-btn" onclick="switchTab('verify')" id="tab-btn-verify">
                         <span class="nav-icon">🛡️</span>
@@ -766,7 +770,8 @@
                     </button>
                     <button class="nav-btn" onclick="switchTab('chat')" id="tab-btn-chat">
                         <span class="nav-icon">💬</span>
-                        <span>Pharmacist Live Chat</span>
+                        <span id="tab-btn-chat-label">Pharmacist Live Chat</span>
+                        <span class="chat-unread-badge" id="chat-unread-badge" style="display:none;">0</span>
                     </button>
 
                     <button class="nav-btn" onclick="switchTab('stock')" id="tab-btn-stock" style="display:none;">
@@ -1135,26 +1140,7 @@
                                 <div class="detected-items-list" id="detected-items-list" style="display:none;"></div>
                             </div>
 
-                            <!-- Voice Note Recorder Widget -->
-                            <div class="voice-recorder-widget rx-upload-page-voice" id="rx-voice-widget-page" style="padding:12px 18px; border-top:1px solid #e2e8f0; background:#f8fafc;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <span style="font-size:0.82rem; font-weight:700; color:var(--text-heading, #1e293b);">🎙️ Voice Note / Audio Symptoms</span>
-                                    <span id="voice-timer-page" style="font-size:0.8rem; font-weight:700; color:#ef4444; display:none;">● 00:00</span>
-                                </div>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <button type="button" class="btn btn-secondary btn-sm" id="btn-record-voice-page" onclick="toggleVoiceRecording('page')">
-                                        <span id="rec-btn-text-page">🎙️ Record Memo</span>
-                                    </button>
-                                    <label class="btn btn-secondary btn-sm" style="margin:0; cursor:pointer;" title="Upload existing audio file">
-                                        📁 Attach Audio
-                                        <input type="file" accept="audio/*" style="display:none;" onchange="handleVoiceAudioFile(event, 'page')">
-                                    </label>
-                                </div>
-                                <div id="voice-preview-box-page" style="margin-top:8px; display:none; align-items:center; gap:10px;">
-                                    <audio id="voice-audio-preview-page" controls style="height:32px; flex:1;"></audio>
-                                    <button type="button" class="btn-clear-voice" onclick="clearVoiceRecording('page')" title="Discard voice note" style="background:none; border:none; color:#ef4444; font-size:1.1rem; cursor:pointer;">&times;</button>
-                                </div>
-                            </div>
+
 
                             <div class="detected-card-footer">
                                 <button type="button" class="btn-confirm-add-history" id="btn-confirm-add-history" onclick="confirmAndAddRxToHistory()" disabled>
@@ -1278,48 +1264,157 @@
                     </div>
                 </section>
 
-                <!-- Tab 6: Appointments & Doses (Appointment Management System) -->
+                <!-- Tab 6: Medication Reminders & Dose Scheduler -->
                 <section id="tab-reminders" class="tab-view">
-                    <div class="section-header">
+                    <div class="section-header" style="margin-bottom:16px;">
                         <div>
-                            <h2>📅 Appointments & Doses Scheduler</h2>
-                            <p class="text-muted">Appointment Management System — Track scheduled pharmacist appointments, medication intake times, and automated alerts.</p>
+                            <h2>⏰ Medication Reminders & Dose Scheduler</h2>
+                            <p class="text-muted">Smart Pill Tracker & Dose Management — Track daily intake, log taken medications, and set automated alerts.</p>
                         </div>
-                        <div class="header-actions">
-                            <button class="btn btn-secondary" onclick="triggerTestAlarm()">🔔 Test Instant Alarm</button>
-                            <button class="btn btn-primary" onclick="openReminderModal()">+ Add Appointment / Dose</button>
+                        <div class="header-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                            <button class="btn btn-sync-rx" onclick="handleSyncFromPrescriptions()" title="Auto-schedule reminders from your uploaded prescriptions">
+                                ⚡ Sync from Prescriptions
+                            </button>
+                            <button class="btn btn-instant-alarm" onclick="triggerTestAlarm()" title="Test instant alarm modal and chime">
+                                🔔 Test Instant Alarm
+                            </button>
+                            <button class="btn btn-primary" onclick="openReminderModal()">
+                                + Add Dose Reminder
+                            </button>
                         </div>
                     </div>
 
-                    <div class="reminders-grid" id="reminders-container"></div>
+                    <!-- Daily Adherence & Progress Card -->
+                    <div class="reminders-adherence-card">
+                        <div class="reminders-adherence-header">
+                            <div class="adherence-title-group">
+                                <h3 class="adherence-title">📊 Today's Intake Compliance</h3>
+                            </div>
+                            <div style="font-size:0.95rem; font-weight:800; color:#10b981;" id="adherence-pct-text">
+                                0% Completed
+                            </div>
+                        </div>
+                        <div class="adherence-progress-bar-wrap">
+                            <div class="adherence-progress-bar-fill" id="adherence-progress-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="adherence-stats-row">
+                            <div class="adherence-stat-item">
+                                <span>📋 Total Scheduled:</span>
+                                <strong id="adherence-total-count">0</strong>
+                            </div>
+                            <div class="adherence-stat-item">
+                                <span style="color:#10b981;">✓ Taken Today:</span>
+                                <strong id="adherence-taken-count" style="color:#10b981;">0</strong>
+                            </div>
+                            <div class="adherence-stat-item">
+                                <span style="color:#f59e0b;">⏳ Pending:</span>
+                                <strong id="adherence-pending-count" style="color:#f59e0b;">0</strong>
+                            </div>
+                            <div class="adherence-stat-item" style="margin-left:auto;">
+                                <small class="text-muted">Reset daily at midnight</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Bar by Time of Day -->
+                    <div class="reminders-filter-bar" id="reminders-filter-bar">
+                        <button class="rem-filter-pill active" onclick="filterReminders('ALL', this)">All Doses</button>
+                        <button class="rem-filter-pill" onclick="filterReminders('MORNING', this)">🌅 Morning (06:00 - 12:00)</button>
+                        <button class="rem-filter-pill" onclick="filterReminders('AFTERNOON', this)">☀️ Afternoon (12:00 - 17:00)</button>
+                        <button class="rem-filter-pill" onclick="filterReminders('EVENING', this)">🌆 Evening (17:00 - 21:00)</button>
+                        <button class="rem-filter-pill" onclick="filterReminders('NIGHT', this)">🌙 Night / Bedtime (21:00+)</button>
+                        <button class="rem-filter-pill" onclick="filterReminders('PENDING', this)">⏳ Pending Today</button>
+                        <button class="rem-filter-pill" onclick="filterReminders('TAKEN', this)">✅ Taken Today</button>
+                    </div>
+
+                    <div class="reminders-grid" id="reminders-container">
+                        <!-- Populated dynamically by renderReminders() -->
+                    </div>
                 </section>
 
                 <!-- Tab 7: Pharmacist Live Chat -->
                 <section id="tab-chat" class="tab-view">
-                    <div class="section-header">
+                    <div class="section-header" style="margin-bottom: 16px;">
                         <div>
                             <h2>💬 Live Patient – Pharmacist Consultation</h2>
-                            <p class="text-muted">Direct communication channel between patients and verified pharmacists.</p>
+                            <p class="text-muted">Direct tele-pharmacy channel between patients and verified licensed pharmacists.</p>
                         </div>
                     </div>
 
                     <div class="chat-container-card">
-                        <div class="chat-header">
-                            <div class="chat-user-info">
-                                <span class="avatar">🩺</span>
-                                <div>
-                                    <strong>Dr. Farhan Kabir</strong>
-                                    <span class="text-muted">Licensed Pharmacist | Lazz Pharma</span>
+                        <!-- Left: Messenger-Style Pharmacists / Conversations Sidebar -->
+                        <div class="chat-messenger-sidebar">
+                            <div class="chat-messenger-sidebar-header">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:1.15rem;">💬</span>
+                                    <strong id="chat-sidebar-title" style="font-size:0.95rem; color:var(--text-primary, #f8fafc);">Consultations</strong>
                                 </div>
+                                <span class="badge badge-success" id="chat-online-badge" style="font-size:0.65rem; padding:2px 6px;">ONLINE</span>
                             </div>
-                            <span class="online-indicator"><span class="pulse-dot"></span> Online</span>
+                            <div class="chat-threads-list" id="chat-threads-list">
+                                <!-- Populated dynamically by loadConversationsList() -->
+                            </div>
                         </div>
 
-                        <div class="chat-messages-box" id="chat-messages-box"></div>
+                        <!-- Right: Active Chat Conversation Panel (Messenger Style) -->
+                        <div class="chat-messenger-main">
+                            <!-- Chat Header with Pharmacist Switcher -->
+                            <div class="chat-header">
+                                <div class="chat-user-info">
+                                    <div class="chat-avatar-badge" id="chat-active-avatar">🩺</div>
+                                    <div>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <strong id="chat-active-pharma-name" style="font-size:1.05rem;">Dr. Farhan Kabir</strong>
+                                            <span class="badge badge-success" id="chat-active-role-badge" style="font-size:0.7rem; padding:2px 6px;">DGDA VERIFIED</span>
+                                        </div>
+                                        <span class="text-muted" id="chat-active-pharma-store" style="font-size:0.82rem;">Licensed Pharmacist | Lazz Pharma (Dhanmondi)</span>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span class="online-indicator"><span class="pulse-dot"></span> <span id="chat-online-label">Online</span></span>
+                                </div>
+                            </div>
 
-                        <div class="chat-input-bar">
-                            <input type="text" id="chat-input" placeholder="Type your medication query..." onkeyup="if(event.key==='Enter') sendChatMessage()">
-                            <button class="btn btn-primary" onclick="sendChatMessage()">Send</button>
+                            <!-- Quick Clinical Consultation Chips -->
+                            <div class="chat-quick-chips-bar" id="chat-quick-chips-bar">
+                                <span class="chat-quick-chips-label">⚡ Quick Inquiries:</span>
+                                <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Check drug interactions for my active medications.')">
+                                    💊 Check Interactions
+                                </button>
+                                <button type="button" class="chat-chip" onclick="sendQuickChatMessage('What is the optimal dosing time and meal schedule for my medicines?')">
+                                    ⏱️ Dosing &amp; Schedule
+                                </button>
+                                <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Are there any known adverse side effects or food precautions for these drugs?')">
+                                    ⚠️ Adverse Side Effects
+                                </button>
+                                <button type="button" class="chat-chip" onclick="openChatAttachRxModal()">
+                                    📎 Share Prescription #101
+                                </button>
+                            </div>
+
+                            <!-- Messages Feed Container -->
+                            <div class="chat-messages-box" id="chat-messages-box">
+                                <!-- Populated dynamically -->
+                            </div>
+
+                            <!-- Live Typing Indicator -->
+                            <div class="chat-typing-box" id="chat-typing-indicator" style="margin: 0 20px 8px;">
+                                <div class="chat-typing-dots">
+                                    <span></span><span></span><span></span>
+                                </div>
+                                <span id="chat-typing-text">Dr. Farhan Kabir is typing clinical advice...</span>
+                            </div>
+
+                            <!-- Input Bar with Prescription Attachment Button -->
+                            <div class="chat-input-bar">
+                                <button type="button" class="btn-chat-attach" onclick="openChatAttachRxModal()" title="Attach a verified prescription">
+                                    <span>📎</span> <span>Attach Rx</span>
+                                </button>
+                                <input type="text" id="chat-input" placeholder="Type your medication query (e.g. Can I take Napa Extra with Seclo 20?)..." onkeyup="if(event.key==='Enter') sendChatMessage()">
+                                <button type="button" class="btn-chat-send" onclick="sendChatMessage()">
+                                    <span>Send</span> <span>➤</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1799,11 +1894,445 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- Tab 9: Master Admin Portal View -->
+                <section id="tab-admin" class="tab-view">
+                    <div class="admin-portal-header">
+                        <div class="admin-header-title-box">
+                            <div class="admin-shield-icon">📊</div>
+                            <div>
+                                <div class="admin-title-row">
+                                    <h2>Admin Dashboard</h2>
+                                </div>
+                                <p class="admin-header-subtitle">Comprehensive system orchestration: User management, Medicine Catalog CRUD, Prescriptions oversight, and platform-wide broadcasts.</p>
+                            </div>
+                        </div>
+                        <div class="admin-quick-actions">
+                            <button type="button" class="btn-admin-action" onclick="openAdminAddUserModal()">
+                                <span>➕</span> Add User
+                            </button>
+                            <button type="button" class="btn-admin-action" onclick="openAdminAddPharmacyModal()">
+                                <span>🏥</span> Add Pharmacy
+                            </button>
+                            <button type="button" class="btn-admin-action" onclick="openAdminAddMedicineModal()">
+                                <span>💊</span> Add Medicine
+                            </button>
+                            <button type="button" class="btn-admin-action btn-admin-accent" onclick="switchAdminSubTab('broadcast')">
+                                <span>📢</span> Global Alert
+                            </button>
+                            <button type="button" class="btn-admin-action btn-admin-refresh" onclick="loadAdminData()" title="Reload System Telemetry">
+                                <span>🔄</span> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Telemetry KPI Ribbon -->
+                    <div class="admin-kpi-grid">
+                        <div class="admin-kpi-card">
+                            <div class="kpi-icon-badge kpi-blue">👥</div>
+                            <div class="kpi-details">
+                                <span class="kpi-label">Total Users</span>
+                                <h3 id="admin-kpi-users">--</h3>
+                                <small id="admin-kpi-users-breakdown" class="kpi-sub">Patients: - | Pharmacists: - | Admins: -</small>
+                            </div>
+                        </div>
+                        <div class="admin-kpi-card">
+                            <div class="kpi-icon-badge kpi-purple">🏥</div>
+                            <div class="kpi-details">
+                                <span class="kpi-label">Partner Pharmacies</span>
+                                <h3 id="admin-kpi-pharmacies">--</h3>
+                                <small class="kpi-sub">Licensed stock-holding dispensaries</small>
+                            </div>
+                        </div>
+                        <div class="admin-kpi-card">
+                            <div class="kpi-icon-badge kpi-emerald">💊</div>
+                            <div class="kpi-details">
+                                <span class="kpi-label">Active Medicines</span>
+                                <h3 id="admin-kpi-medicines">--</h3>
+                                <small class="kpi-sub">DGDA Bangladesh verified repository</small>
+                            </div>
+                        </div>
+                        <div class="admin-kpi-card">
+                            <div class="kpi-icon-badge kpi-amber">📋</div>
+                            <div class="kpi-details">
+                                <span class="kpi-label">Prescriptions Audited</span>
+                                <h3 id="admin-kpi-rx">--</h3>
+                                <small id="admin-kpi-rx-breakdown" class="kpi-sub">Pending: - | Verified: - | Dispensed: -</small>
+                            </div>
+                        </div>
+                        <div class="admin-kpi-card">
+                            <div class="kpi-icon-badge kpi-cyan">⚡</div>
+                            <div class="kpi-details">
+                                <span class="kpi-label">System Health & JVM</span>
+                                <h3 id="admin-kpi-health">HEALTHY</h3>
+                                <small id="admin-kpi-memory" class="kpi-sub">Memory: -- / -- MB | Uptime: --</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Portal Sub Navigation -->
+                    <div class="admin-subnav-bar">
+                        <button type="button" class="admin-nav-tab active" id="admin-tab-btn-users" onclick="switchAdminSubTab('users')">
+                            <span class="subnav-icon">👥</span> Users Directory & Access
+                        </button>
+                        <button type="button" class="admin-nav-tab" id="admin-tab-btn-pharmacies" onclick="switchAdminSubTab('pharmacies')">
+                            <span class="subnav-icon">🏥</span> Pharmacy Network & Licenses
+                        </button>
+                        <button type="button" class="admin-nav-tab" id="admin-tab-btn-medicines" onclick="switchAdminSubTab('medicines')">
+                            <span class="subnav-icon">💊</span> Medicine Catalog & Pricing CRUD
+                        </button>
+                        <button type="button" class="admin-nav-tab" id="admin-tab-btn-prescriptions" onclick="switchAdminSubTab('prescriptions')">
+                            <span class="subnav-icon">📋</span> Prescription Compliance & Audit
+                        </button>
+                        <button type="button" class="admin-nav-tab" id="admin-tab-btn-broadcast" onclick="switchAdminSubTab('broadcast')">
+                            <span class="subnav-icon">📡</span> System Announcements & Event Feed
+                        </button>
+                        <button type="button" class="admin-nav-tab" id="admin-tab-btn-market" onclick="switchAdminSubTab('market')">
+                            <span class="subnav-icon">📊</span> BD Market Live Price Sync
+                        </button>
+                    </div>
+
+                    <!-- SUBPANEL 1: USERS DIRECTORY -->
+                    <div class="admin-subpanel active" id="admin-subpanel-users">
+                        <div class="admin-table-toolbar">
+                            <div class="admin-search-wrapper">
+                                <span class="search-lens">🔍</span>
+                                <input type="text" id="admin-user-search" placeholder="Search by name, email, or user ID..." oninput="filterAdminUsersTable()">
+                            </div>
+                            <div class="admin-filter-group">
+                                <select id="admin-user-role-filter" onchange="filterAdminUsersTable()">
+                                    <option value="ALL">All Roles</option>
+                                    <option value="PATIENT">Patients Only</option>
+                                    <option value="PHARMACIST">Pharmacists Only</option>
+                                    <option value="ADMIN">Administrators Only</option>
+                                </select>
+                                <button type="button" class="btn-admin-export" onclick="exportUsersCsv()" title="Export Users list to CSV">
+                                    <span>📥</span> Export CSV
+                                </button>
+                                <button type="button" class="btn-admin-add-item" onclick="openAdminAddUserModal()">
+                                    <span>➕</span> Create New User
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="admin-table-container">
+                            <table class="admin-table" id="admin-users-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User Profile</th>
+                                        <th>Role</th>
+                                        <th>Contact / Address</th>
+                                        <th>Credentials</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-table-body">
+                                    <tr>
+                                        <td colspan="6" class="table-loading-cell">Loading users from PostgreSQL database...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SUBPANEL 2: PHARMACY NETWORK MANAGEMENT -->
+                    <div class="admin-subpanel" id="admin-subpanel-pharmacies" style="display:none;">
+                        <div class="admin-table-toolbar">
+                            <div class="admin-search-wrapper">
+                                <span class="search-lens">🔍</span>
+                                <input type="text" id="admin-pharma-search" placeholder="Search pharmacy name, branch address, area..." oninput="filterAdminPharmaciesTable()">
+                            </div>
+                            <div class="admin-filter-group">
+                                <select id="admin-pharma-filter-hours" onchange="filterAdminPharmaciesTable()">
+                                    <option value="ALL">All Operating Hours</option>
+                                    <option value="24H">24/7 Open Only</option>
+                                    <option value="EMERGENCY">Emergency Delivery Only</option>
+                                </select>
+                                <button type="button" class="btn-admin-export" onclick="exportPharmaciesCsv()" title="Export Pharmacies to CSV">
+                                    <span>📥</span> Export CSV
+                                </button>
+                                <button type="button" class="btn-admin-add-item" onclick="openAdminAddPharmacyModal()">
+                                    <span>➕</span> Register Partner Pharmacy
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="admin-table-container">
+                            <table class="admin-table" id="admin-pharmacies-table">
+                                <thead>
+                                    <tr>
+                                        <th>Pharmacy ID</th>
+                                        <th>Partner Store & Area</th>
+                                        <th>Branch Address</th>
+                                        <th>Contact Phone</th>
+                                        <th>24/7 Hours</th>
+                                        <th>Emergency Delivery</th>
+                                        <th>Inventory SKUs</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-pharmacies-table-body">
+                                    <tr>
+                                        <td colspan="8" class="table-loading-cell">Loading pharmacy network...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SUBPANEL 2: MEDICINE CATALOG CRUD -->
+                    <div class="admin-subpanel" id="admin-subpanel-medicines" style="display:none;">
+                        <div class="admin-table-toolbar">
+                            <div class="admin-search-wrapper">
+                                <span class="search-lens">🔍</span>
+                                <input type="text" id="admin-med-search" placeholder="Search brand name, generic formulation, manufacturer..." oninput="filterAdminMedicinesTable()">
+                            </div>
+                            <div class="admin-filter-group">
+                                <select id="admin-med-company-filter" onchange="filterAdminMedicinesTable()">
+                                    <option value="ALL">All Manufacturers</option>
+                                </select>
+                                <button type="button" class="btn-admin-export" onclick="exportMedicinesCsv()" title="Export Catalog to CSV">
+                                    <span>📥</span> Export CSV
+                                </button>
+                                <button type="button" class="btn-admin-add-item" onclick="openAdminAddMedicineModal()">
+                                    <span>➕</span> Add New Medicine
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="admin-table-container">
+                            <table class="admin-table" id="admin-medicines-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Brand Name</th>
+                                        <th>Generic Formulation</th>
+                                        <th>Manufacturer</th>
+                                        <th>Strength / Dosage</th>
+                                        <th>Unit Price (৳)</th>
+                                        <th>Rx Required</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-medicines-table-body">
+                                    <tr>
+                                        <td colspan="8" class="table-loading-cell">Loading medicine repository...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SUBPANEL 3: PRESCRIPTIONS MASTER QUEUE -->
+                    <div class="admin-subpanel" id="admin-subpanel-prescriptions" style="display:none;">
+                        <div class="admin-table-toolbar">
+                            <div class="admin-search-wrapper">
+                                <span class="search-lens">🔍</span>
+                                <input type="text" id="admin-rx-search" placeholder="Search by prescription ID, patient name, doctor..." oninput="filterAdminPrescriptionsTable()">
+                            </div>
+                            <div class="admin-filter-group">
+                                <select id="admin-rx-status-filter" onchange="filterAdminPrescriptionsTable()">
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="UPLOADED">Pending Verification (Uploaded)</option>
+                                    <option value="VERIFIED">Verified Genuine</option>
+                                    <option value="DISPENSED">Dispensed & Fulfilled</option>
+                                    <option value="REJECTED">Flagged / Rejected</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="admin-table-container">
+                            <table class="admin-table" id="admin-prescriptions-table">
+                                <thead>
+                                    <tr>
+                                        <th>RX ID</th>
+                                        <th>Patient Name</th>
+                                        <th>Doctor & Hospital</th>
+                                        <th>Extracted Medication Items</th>
+                                        <th>Uploaded Time</th>
+                                        <th>Status</th>
+                                        <th style="text-align:right;">Admin Workflow Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-prescriptions-table-body">
+                                    <tr>
+                                        <td colspan="7" class="table-loading-cell">Loading prescription master queue...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SUBPANEL 4: BROADCAST & LIVE AUDIT FEED -->
+                    <div class="admin-subpanel" id="admin-subpanel-broadcast" style="display:none;">
+                        <div class="admin-broadcast-grid">
+                            <!-- Broadcast Dispatch Box -->
+                            <div class="admin-card broadcast-sender-card">
+                                <div class="admin-card-header">
+                                    <div class="card-icon-title">
+                                        <span class="card-icon">📢</span>
+                                        <div>
+                                            <h3>Push Global Live Announcement</h3>
+                                            <p>Dispatches an instantaneous Server-Sent Event (SSE) to all connected clients and active sessions.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="admin-card-body">
+                                    <div class="input-group">
+                                        <label>Announcement Headline / Message *</label>
+                                        <textarea id="admin-broadcast-text" rows="3" placeholder="e.g. ⚡ System Update: Emergency pharmacy network in Dhaka expanded. 24/7 delivery active."></textarea>
+                                    </div>
+                                    <div class="broadcast-action-row">
+                                        <button type="button" class="btn btn-primary btn-broadcast-send" onclick="submitAdminBroadcast()">
+                                            <span>🚀 Dispatch Global Alert</span>
+                                        </button>
+                                        <span class="broadcast-note">Event is transmitted via `/api/events/stream` and saved to audit logs.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Live Telemetry & Event Audit Stream -->
+                            <div class="admin-card audit-feed-card">
+                                <div class="admin-card-header">
+                                    <div class="card-icon-title">
+                                        <span class="card-icon">📜</span>
+                                        <div>
+                                            <h3>Live Event Stream & Audit Logs</h3>
+                                            <p>Real-time telemetry of prescription scans, stock modifications, and authentications.</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn-clear-logs" onclick="loadAdminData()">🔄 Sync</button>
+                                </div>
+                                <div class="admin-card-body">
+                                    <div class="admin-terminal-feed" id="admin-audit-feed">
+                                        <div class="terminal-line">[SYSTEM_CONNECTED] Real-time MediLink Observer Event Stream Online.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUBPANEL 5: BANGLADESH MARKET LIVE PRICE SYNC -->
+                    <div class="admin-subpanel" id="admin-subpanel-market">
+                        <div class="market-status-bar">
+                            <div class="market-status-info">
+                                <span class="market-pulse-dot"></span>
+                                <div>
+                                    <div class="market-status-title">
+                                        <span id="market-provider-name">Bangladesh DGDA &amp; Medex National Pricing Index</span>
+                                        <span class="market-badge-sync" id="market-sync-status-badge">AUTO-SYNC ACTIVE</span>
+                                    </div>
+                                    <div class="market-status-sub" id="market-sync-time-label">
+                                        Last Synchronized: <span id="market-last-sync-time">Just now</span> • Sync Interval: 5 mins • Adapter: Real-time Webhook &amp; Benchmark Registry
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="market-actions-group">
+                                <button type="button" class="btn-market-sync" onclick="syncMarketPricesNow()">
+                                    <span>🔄</span> Sync Market Now
+                                </button>
+                                <button type="button" class="btn-market-simulate" onclick="simulateMarketPriceFluctuation()">
+                                    <span>⚡</span> Simulate DGDA Fluctuation
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Market Live Rates Table -->
+                        <div class="admin-card" style="margin-bottom: 24px;">
+                            <div class="admin-card-header">
+                                <div class="admin-card-title-box">
+                                    <span class="card-icon">🇧🇩</span>
+                                    <div>
+                                        <h3>Official Bangladesh Market Medicine Registry</h3>
+                                        <p>Live benchmark prices sourced from Directorate General of Drug Administration (DGDA) &amp; Medex Bangladesh.</p>
+                                    </div>
+                                </div>
+                                <span class="text-muted" style="font-size:0.85rem;" id="market-items-count">0 items loaded</span>
+                            </div>
+                            <div class="admin-card-body" style="padding: 0;">
+                                <div class="admin-table-container">
+                                    <table class="admin-table" id="admin-market-prices-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Brand Name</th>
+                                                <th>Generic Name</th>
+                                                <th>Manufacturer</th>
+                                                <th>Strength / Form</th>
+                                                <th>DGDA / Medex MRP (৳)</th>
+                                                <th>MediLink System Price (৳)</th>
+                                                <th>Sync Status</th>
+                                                <th>Last Verified</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="market-prices-tbody">
+                                            <tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live Bangladesh market rates...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Price Fluctuation Audit Log Table -->
+                        <div class="admin-card">
+                            <div class="admin-card-header">
+                                <div class="admin-card-title-box">
+                                    <span class="card-icon">📜</span>
+                                    <div>
+                                        <h3>Price Fluctuation History &amp; Audit Trail</h3>
+                                        <p>Persistent record of all price adjustments, regulatory updates, and automated distributor syncs.</p>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn-clear-logs" onclick="loadMarketPriceHistory()">🔄 Refresh History</button>
+                            </div>
+                            <div class="admin-card-body" style="padding: 0;">
+                                <div class="admin-table-container">
+                                    <table class="admin-table" id="admin-price-history-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Medicine Brand</th>
+                                                <th>Previous Price</th>
+                                                <th>New Market Price</th>
+                                                <th>Change (৳ / %)</th>
+                                                <th>Trigger / Regulatory Source</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="market-history-tbody">
+                                            <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted);">No price fluctuations logged yet.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </main>
         </div>
     </div>
 
     <!-- Modals -->
+    <!-- Modal: Attach Prescription to Pharmacist Live Chat -->
+    <div id="modal-chat-attach-rx" class="modal-overlay">
+        <div class="modal-card" style="max-width: 520px;">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.3rem;">📋</span>
+                    <h3 style="margin:0;">Attach Prescription to Consultation</h3>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-chat-attach-rx')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:0.88rem; margin-top:0;">Select a verified digital prescription to share with the pharmacist for live medication review:</p>
+                <div id="chat-attach-rx-list" style="display:flex; flex-direction:column; gap:10px; max-height:280px; overflow-y:auto;">
+                    <!-- Dynamically populated from state.prescriptions -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-chat-attach-rx')">Cancel</button>
+            </div>
+        </div>
+    </div>
     <div id="modal-rx-upload" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
@@ -1826,28 +2355,7 @@
 2. Cap Seclo 20mg (1+0+1 before meal) - 7 days
 3. Tab Monas 10mg (0+0+1 night) - 14 days</textarea>
                 </div>
-                <div class="input-group" style="margin-top:14px;">
-                    <label style="display:flex; justify-content:space-between; align-items:center;">
-                        <span>🎙️ Patient Voice Note (Audio Memo):</span>
-                        <small class="text-muted">Optional</small>
-                    </label>
-                    <div class="voice-recorder-widget" id="rx-voice-widget-modal">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <button type="button" class="btn btn-secondary btn-sm" id="btn-record-voice-modal" onclick="toggleVoiceRecording('modal')">
-                                <span id="rec-btn-text-modal">🎙️ Record Voice Note</span>
-                            </button>
-                            <label class="btn btn-secondary btn-sm" style="margin:0; cursor:pointer;" title="Upload existing audio file">
-                                📁 Attach Audio
-                                <input type="file" accept="audio/*" style="display:none;" onchange="handleVoiceAudioFile(event, 'modal')">
-                            </label>
-                            <span id="voice-timer-modal" style="font-size:0.85rem; font-weight:700; color:#ef4444; display:none;">● 00:00</span>
-                        </div>
-                        <div id="voice-preview-box-modal" style="margin-top:8px; display:none; align-items:center; gap:10px;">
-                            <audio id="voice-audio-preview-modal" controls style="height:32px; flex:1;"></audio>
-                            <button type="button" class="btn-clear-voice" onclick="clearVoiceRecording('modal')" title="Discard voice note" style="background:none; border:none; color:#ef4444; font-size:1.1rem; cursor:pointer;">&times;</button>
-                        </div>
-                    </div>
-                </div>
+
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('modal-rx-upload')">Cancel</button>
@@ -1959,42 +2467,101 @@
         </div>
     </div>
 
+    <!-- Modal: Add / Schedule Dose Reminder -->
     <div id="modal-reminder" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <h3>Schedule Appointment / Medicine Reminder</h3>
+                <h3>⏰ Schedule Dose Reminder</h3>
                 <button class="btn-close" onclick="closeModal('modal-reminder')">&times;</button>
             </div>
             <div class="modal-body">
+                <!-- Optional Quick-Fill from Patient's Prescriptions -->
+                <div class="input-group" id="rem-quickfill-group">
+                    <label style="display:flex; justify-content:space-between;">
+                        <span>📋 Quick Select from Active Prescription:</span>
+                        <small class="text-muted">Auto-fills details</small>
+                    </label>
+                    <select id="rem-prescription-picker" onchange="handlePrescriptionPickerChange(this)">
+                        <option value="">-- Or enter custom medicine below --</option>
+                    </select>
+                </div>
+
                 <div class="input-group">
-                    <label>Appointment / Medicine Name:</label>
-                    <input type="text" id="rem-med-name" placeholder="e.g. Appointment: Dr. Farhan Kabir or Napa Extra">
+                    <label>Medicine Name: *</label>
+                    <input type="text" id="rem-med-name" placeholder="e.g. Napa Extra, Seclo 20, Monas 10" required>
                 </div>
                 <div class="input-group">
-                    <label>Type / Dosage:</label>
-                    <input type="text" id="rem-dosage" placeholder="e.g. Teleconsultation or 1 Tablet (500mg)">
+                    <label>Strength / Dosage Form: *</label>
+                    <input type="text" id="rem-dosage" placeholder="e.g. 1 Tablet (500mg), 1 Capsule (20mg)" value="1 Tablet">
                 </div>
                 <div class="input-group">
-                    <label>Scheduled Time:</label>
-                    <input type="time" id="rem-time" value="08:00">
+                    <label>Scheduled Intake Time: *</label>
+                    <input type="time" id="rem-time" value="08:00" required>
+                </div>
+                <div class="input-group">
+                    <label>Meal & Food Instruction:</label>
+                    <select id="rem-meal-timing">
+                        <option value="AFTER_MEAL">🍽️ Take After Meal (with water)</option>
+                        <option value="BEFORE_MEAL">🥣 Take 30 Mins Before Meal</option>
+                        <option value="WITH_MEAL">🥗 Take With Meal / Food</option>
+                        <option value="EMPTY_STOMACH">💧 Take On Empty Stomach</option>
+                        <option value="BEDTIME">🌙 Take at Bedtime / Night</option>
+                    </select>
                 </div>
                 <div class="input-group">
                     <label>Frequency:</label>
                     <select id="rem-freq">
-                        <option value="ONCE">Once (Appointment)</option>
-                        <option value="DAILY">Daily (Medication)</option>
-                        <option value="TWICE_DAILY">Twice Daily</option>
+                        <option value="DAILY">Daily (Every Day)</option>
+                        <option value="TWICE_DAILY">Twice Daily (Morning & Night)</option>
+                        <option value="THREE_TIMES">3 Times Daily (Morning, Afternoon, Night)</option>
                         <option value="WEEKLY">Weekly</option>
+                        <option value="AS_NEEDED">As Needed (SOS)</option>
                     </select>
                 </div>
                 <div class="input-group">
-                    <label>Special Instructions / Details:</label>
-                    <input type="text" id="rem-instructions" value="Pharmacist Consultation / Take with full glass of water">
+                    <label>Additional Notes / Instructions:</label>
+                    <input type="text" id="rem-instructions" placeholder="e.g. Drink full glass of water, do not crush tablet" value="Take with full glass of water">
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('modal-reminder')">Cancel</button>
-                <button class="btn btn-primary" onclick="submitNewReminder()">Save Schedule</button>
+                <button class="btn btn-primary" onclick="submitNewReminder()">Save Reminder Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Interactive Medication Alarm Ringing -->
+    <div id="modal-alarm-ringing" class="modal-overlay" style="z-index: 9999;">
+        <div class="modal-card alarm-ringing-card">
+            <div class="alarm-bell-icon-wrap">
+                <span class="alarm-bell-swing">🔔</span>
+            </div>
+            <div style="margin-bottom:6px;">
+                <span class="badge badge-danger" style="font-size:0.75rem; letter-spacing:0.5px; padding:4px 10px;">MEDICINE ALARM DUE</span>
+            </div>
+            <h2 id="alarm-modal-med-name" style="margin: 8px 0 4px 0; font-size: 1.35rem; font-weight: 800; color: var(--text-primary, #0f172a);">
+                Napa Extra 500mg
+            </h2>
+            <p id="alarm-modal-dosage" style="font-size: 1.05rem; font-weight: 700; color: #0284c7; margin-bottom: 8px;">
+                1 Tablet
+            </p>
+            <div style="background: rgba(2, 132, 199, 0.08); border-radius: 10px; padding: 12px; margin-bottom: 20px;">
+                <p id="alarm-modal-instructions" style="margin: 0; font-size: 0.9rem; color: var(--text-muted, #475569); font-weight: 600;">
+                    🍽️ Take after breakfast with a full glass of water.
+                </p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-take-dose" style="width: 100%; justify-content: center; font-size: 1rem; padding: 12px; font-weight: 800;" onclick="handleAlarmModalTakeDose()">
+                    ✓ Mark Dose as Taken
+                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-snooze-dose" style="flex: 1; padding: 10px;" onclick="handleAlarmModalSnooze(10)">
+                        ⏰ Snooze 10 Mins
+                    </button>
+                    <button type="button" class="btn btn-secondary" style="flex: 1; padding: 10px;" onclick="closeAlarmModal()">
+                        Dismiss
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2092,12 +2659,12 @@
 
                     <div class="auth-input-group">
                         <div class="label-with-link">
-                            <label>Password * (must contain at least 8 symbols)</label>
-                            <a href="#" class="forgot-link" onclick="showToast('Password reset link sent to your registered email.')">Forgot password?</a>
+                            <label>Password * (must contain at least 6 symbols)</label>
+                            <a href="javascript:void(0)" class="forgot-link" onclick="openForgotPasswordModal()">Forgot password?</a>
                         </div>
                         <div class="auth-input-wrapper">
                             <span class="input-icon">🔒</span>
-                            <input type="password" id="signin-password" placeholder="••••••••••••" required minlength="8">
+                            <input type="password" id="signin-password" placeholder="••••••••••••" required minlength="6">
                             <span class="toggle-password-icon" onclick="togglePasswordVisibility('signin-password')">👁️</span>
                         </div>
                     </div>
@@ -2137,12 +2704,14 @@
                     <h2>Sign Up</h2>
                 </div>
 
-                <!-- Role Selector (Patient, Pharmacist, Admin) -->
+                <!-- Role Selector (Patient, Pharmacist) - Admins are seeded / internal only -->
                 <div class="auth-role-tabs">
                     <button type="button" class="role-tab active" id="signup-tab-patient" onclick="selectAuthRole('PATIENT', 'signup')">👤 Patient</button>
                     <button type="button" class="role-tab" id="signup-tab-pharmacist" onclick="selectAuthRole('PHARMACIST', 'signup')">🩺 Pharmacist</button>
-                    <button type="button" class="role-tab" id="signup-tab-admin" onclick="selectAuthRole('ADMIN', 'signup')">🛡️ Admin</button>
                 </div>
+
+                <!-- Dynamic Auth Alert Banner (For "User already exists", etc.) -->
+                <div id="signup-alert-box" class="auth-alert-box" style="display:none;"></div>
 
                 <!-- Signup Form -->
                 <form id="signup-form" onsubmit="handleAuthSubmit(event, 'signup')">
@@ -2333,7 +2902,387 @@
         </div>
     </div>
 
-    <script src="app.js?v=5.0"></script>
+    <!-- Forgot Password / Account Recovery Modal -->
+    <div id="modal-forgot-password" class="modal-overlay auth-modal-backdrop" onclick="if(event.target===this) closeForgotPasswordModal()">
+        <div class="modal-card" style="max-width: 500px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); backdrop-filter: blur(20px); padding: 28px 32px; animation: cardAppear 0.3s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #2563eb, #38bdf8); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px;">🔑</div>
+                    <div>
+                        <h3 style="margin: 0; color: #ffffff; font-size: 1.25rem;">Password Recovery</h3>
+                        <small style="color: #94a3b8; font-size: 0.78rem;">MediLink 2.0 Security Portal</small>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeForgotPasswordModal()" style="color:#94a3b8; font-size: 1.5rem; background:transparent; border:none; cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Step Progress Indicator -->
+            <div class="modal-step-tracker" id="modal-step-tracker" style="display: flex; align-items: center; justify-content: space-between; position: relative; margin-bottom: 24px; padding: 0 8px;">
+                <div style="position: absolute; top: 14px; left: 24px; right: 24px; height: 2px; background: #334155; z-index: 1;"></div>
+                <div id="modal-step-fill" style="position: absolute; top: 14px; left: 24px; height: 2px; background: #3b82f6; width: 0%; transition: width 0.3s ease; z-index: 2;"></div>
+                
+                <div class="modal-step-item active" id="modal-node-1" style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <div class="modal-step-dot" id="modal-dot-1" style="width: 28px; height: 28px; border-radius: 50%; background: #2563eb; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; border: 2px solid #60a5fa;">1</div>
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #93c5fd;">Identify</span>
+                </div>
+                <div class="modal-step-item" id="modal-node-2" style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <div class="modal-step-dot" id="modal-dot-2" style="width: 28px; height: 28px; border-radius: 50%; background: #1e293b; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; border: 2px solid #334155;">2</div>
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #64748b;">Verify</span>
+                </div>
+                <div class="modal-step-item" id="modal-node-3" style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <div class="modal-step-dot" id="modal-dot-3" style="width: 28px; height: 28px; border-radius: 50%; background: #1e293b; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; border: 2px solid #334155;">3</div>
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #64748b;">New Pass</span>
+                </div>
+            </div>
+
+            <!-- In-Modal Alert Box -->
+            <div id="modal-forgot-alert" class="auth-alert-box" style="display:none; margin-bottom: 16px;"></div>
+
+            <!-- Step 1: Request OTP -->
+            <div id="modal-step-panel-1">
+                <p style="color: #cbd5e1; font-size: 0.88rem; margin: 0 0 16px 0; line-height: 1.5;">
+                    Enter your registered account email. We will generate and send a 6-digit verification code to confirm your ownership.
+                </p>
+                <div class="auth-input-group">
+                    <label>Account Email *</label>
+                    <div class="auth-input-wrapper">
+                        <span class="input-icon">✉️</span>
+                        <input type="email" id="modal-reset-email" placeholder="name@example.com" required>
+                    </div>
+                </div>
+                <button type="button" class="btn-auth-submit" id="btn-modal-send-otp" onclick="requestModalPasswordResetOtp()">Send Verification Code ➔</button>
+                <div style="text-align: center; margin-top: 14px;">
+                    <a href="javascript:void(0)" onclick="backToSignInFromForgot()" style="color: #60a5fa; font-size: 0.82rem; text-decoration: none; font-weight: 500;">← Back to Sign In</a>
+                </div>
+            </div>
+
+            <!-- Step 2: Enter OTP -->
+            <div id="modal-step-panel-2" style="display: none;">
+                <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 0.82rem;">
+                    <span style="color: #cbd5e1;">Code sent to: <strong id="modal-target-email-disp" style="color: #38bdf8;"></strong></span>
+                    <button type="button" onclick="setModalRecoveryStep(1)" style="background: transparent; border: none; color: #94a3b8; text-decoration: underline; cursor: pointer; font-size: 0.78rem;">Edit</button>
+                </div>
+
+                <div id="modal-demo-pill" style="display: none; background: rgba(56, 189, 248, 0.12); border: 1px dashed rgba(56, 189, 248, 0.4); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; font-size: 0.78rem; color: #bae6fd; justify-content: space-between; align-items: center;">
+                    <span>⚡ <strong>Demo OTP:</strong> <strong id="modal-demo-otp-val" style="color: #38bdf8;"></strong></span>
+                    <button type="button" onclick="autoFillModalOtp()" style="background: #0284c7; color: #fff; border: none; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; cursor: pointer;">Auto-Fill</button>
+                </div>
+
+                <div class="auth-input-group">
+                    <label style="text-align: center; display: block;">Enter 6-Digit Code *</label>
+                    <div class="auth-input-wrapper">
+                        <span class="input-icon">🔢</span>
+                        <input type="text" id="modal-otp-code" placeholder="6-digit code e.g. 123456" maxlength="6" style="letter-spacing: 4px; font-size: 1.1rem; font-weight: 700; text-align: center;" required>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 0.8rem; color: #94a3b8;">
+                    <span>Expires in: <strong id="modal-otp-countdown" style="color: #38bdf8;">05:00</strong></span>
+                    <a href="javascript:void(0)" id="modal-btn-resend" onclick="requestModalPasswordResetOtp(true)" style="color: #60a5fa; text-decoration: none; font-weight: 600;">Resend Code</a>
+                </div>
+
+                <button type="button" class="btn-auth-submit" id="btn-modal-verify-otp" onclick="verifyModalPasswordResetOtp()">Verify Code ➔</button>
+                <div style="text-align: center; margin-top: 14px;">
+                    <a href="javascript:void(0)" onclick="setModalRecoveryStep(1)" style="color: #94a3b8; font-size: 0.82rem; text-decoration: none;">← Change Email Address</a>
+                </div>
+            </div>
+
+            <!-- Step 3: Enter New Password -->
+            <div id="modal-step-panel-3" style="display: none;">
+                <div class="auth-input-group">
+                    <label>New Password *</label>
+                    <div class="auth-input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="modal-new-password" placeholder="Min. 6 characters" required oninput="evaluateModalPasswordStrength()">
+                        <span class="toggle-password-icon" onclick="togglePasswordVisibility('modal-new-password')">👁️</span>
+                    </div>
+                </div>
+
+                <div class="auth-input-group">
+                    <label>Confirm New Password *</label>
+                    <div class="auth-input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="modal-confirm-password" placeholder="Re-enter password" required oninput="evaluateModalPasswordStrength()">
+                        <span class="toggle-password-icon" onclick="togglePasswordVisibility('modal-confirm-password')">👁️</span>
+                    </div>
+                </div>
+
+                <!-- Password rule indicators -->
+                <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.74rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600;">
+                        <span style="color: #94a3b8;">Strength:</span>
+                        <span id="modal-strength-badge" style="color: #ef4444;">Weak</span>
+                    </div>
+                    <div style="height: 4px; background: #334155; border-radius: 2px; overflow: hidden; margin-bottom: 8px;">
+                        <div id="modal-strength-meter" style="height: 100%; width: 25%; background: #ef4444; transition: width 0.3s, background 0.3s;"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; color: #64748b;">
+                        <div id="modal-rule-len">○ Min 6 chars</div>
+                        <div id="modal-rule-match">○ Passwords match</div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-auth-submit" id="btn-modal-submit-reset" onclick="submitModalPasswordReset()">Save New Password ✓</button>
+            </div>
+
+            <!-- Step 4: Success Completion -->
+            <div id="modal-step-panel-4" style="display: none; text-align: center; padding: 15px 0;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #059669, #10b981); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 1.8rem; color: #fff; box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);">✓</div>
+                <h3 style="color: #fff; margin: 0 0 8px 0;">Password Reset Complete!</h3>
+                <p style="color: #94a3b8; font-size: 0.84rem; margin: 0 0 20px 0; line-height: 1.5;">
+                    Your password has been changed. You can now log in using your new credentials.
+                </p>
+                <button type="button" class="btn-auth-submit" onclick="backToSignInFromForgot(true)">Sign In with New Password ➔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin: Add / Edit User Modal -->
+    <div id="modal-admin-user" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-admin-user')">
+        <div class="modal-card admin-modal-card">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.3rem;">👤</span>
+                    <h3 id="admin-user-modal-title" style="margin:0;">Create New User</h3>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-admin-user')">&times;</button>
+            </div>
+            <form id="admin-user-form" onsubmit="handleAdminUserSubmit(event)">
+                <input type="hidden" id="admin-user-id" value="">
+                <div class="modal-body">
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Full Name *</label>
+                            <input type="text" id="admin-user-name" placeholder="e.g. Dr. Sabrina Khan" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Email Address *</label>
+                            <input type="email" id="admin-user-email" placeholder="user@medilink.com" required>
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>User Role *</label>
+                            <select id="admin-user-role" onchange="toggleAdminUserRoleFields()" required>
+                                <option value="PATIENT">Patient (Standard Consumer)</option>
+                                <option value="PHARMACIST">Pharmacist (Stock & Verification)</option>
+                                <option value="ADMIN">System Administrator (Full Control)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label id="admin-user-password-label">Password *</label>
+                            <input type="password" id="admin-user-password" placeholder="••••••••••••" required minlength="6">
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Phone / Mobile</label>
+                            <input type="tel" id="admin-user-phone" placeholder="+8801711223344">
+                        </div>
+                        <div class="input-group" id="admin-group-patient-ec">
+                            <label>Emergency Contact</label>
+                            <input type="tel" id="admin-user-emergency" placeholder="+8801988776655">
+                        </div>
+                    </div>
+
+                    <!-- Role-Specific Dynamic Section -->
+                    <div id="admin-role-patient-fields">
+                        <div class="input-group">
+                            <label>Primary Residential Address</label>
+                            <input type="text" id="admin-user-address" placeholder="House 14, Road 7, Dhanmondi, Dhaka">
+                        </div>
+                    </div>
+
+                    <div id="admin-role-pharma-fields" style="display:none;">
+                        <div class="admin-form-row">
+                            <div class="input-group">
+                                <label>Pharmacy Name</label>
+                                <input type="text" id="admin-user-pharma-name" placeholder="e.g. Lazz Pharma (Dhanmondi)">
+                            </div>
+                            <div class="input-group">
+                                <label>DGDA Pharmacy License #</label>
+                                <input type="text" id="admin-user-pharma-license" placeholder="DGDA-PH-99201">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="admin-role-admin-fields" style="display:none;">
+                        <div class="input-group">
+                            <label>Security Clearance Level</label>
+                            <select id="admin-user-access-level">
+                                <option value="3">Level 3: Full Super Admin (Unrestricted Root Access)</option>
+                                <option value="2">Level 2: Senior Compliance Auditor</option>
+                                <option value="1">Level 1: Support Analyst</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-admin-user')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-admin-user-submit">Save User to Database</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin: Add / Edit Medicine Modal -->
+    <div id="modal-admin-medicine" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-admin-medicine')">
+        <div class="modal-card admin-modal-card">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.3rem;">💊</span>
+                    <h3 id="admin-med-modal-title" style="margin:0;">Add Medicine to Catalog</h3>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-admin-medicine')">&times;</button>
+            </div>
+            <form id="admin-med-form" onsubmit="handleAdminMedicineSubmit(event)">
+                <input type="hidden" id="admin-med-id" value="">
+                <div class="modal-body">
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Brand Name *</label>
+                            <input type="text" id="admin-med-brand" placeholder="e.g. Napa Extra, Seclo 20" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Generic Name (Active Ingredient) *</label>
+                            <input type="text" id="admin-med-generic" placeholder="e.g. Paracetamol + Caffeine" required>
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Pharmaceutical Manufacturer *</label>
+                            <input type="text" id="admin-med-company" placeholder="e.g. Beximco Pharmaceuticals Ltd." required>
+                        </div>
+                        <div class="input-group">
+                            <label>Strength *</label>
+                            <input type="text" id="admin-med-strength" placeholder="e.g. 500mg+65mg, 20mg" required>
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Dosage Formulation *</label>
+                            <select id="admin-med-formulation">
+                                <option value="Tablet">Tablet</option>
+                                <option value="Capsule">Capsule</option>
+                                <option value="Syrup">Syrup</option>
+                                <option value="Suspension">Suspension</option>
+                                <option value="Injection">Injection</option>
+                                <option value="Eye Drops">Eye Drops</option>
+                                <option value="Ointment / Cream">Ointment / Cream</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Unit Base Price (BDT ৳) *</label>
+                            <input type="number" id="admin-med-price" step="0.05" min="0.1" placeholder="e.g. 2.50" required>
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Therapeutic Category</label>
+                            <input type="text" id="admin-med-category" placeholder="e.g. Analgesic, Antacid, Antibiotic">
+                        </div>
+                        <div class="input-group checkbox-group" style="margin-top:28px;">
+                            <label class="custom-checkbox-label">
+                                <input type="checkbox" id="admin-med-rx-req">
+                                <span>Prescription Required (Rx Only)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Side Effects / Warnings</label>
+                        <textarea id="admin-med-side-effects" rows="2" placeholder="e.g. Drowsiness, dry mouth. Consult physician if pregnant."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-admin-medicine')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-admin-med-submit">Save Medicine to Repository</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin: Add / Edit Pharmacy Modal -->
+    <div id="modal-admin-pharmacy" class="modal-overlay" onclick="if(event.target===this) closeModal('modal-admin-pharmacy')">
+        <div class="modal-card admin-modal-card">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.3rem;">🏥</span>
+                    <h3 id="admin-pharma-modal-title" style="margin:0;">Register Partner Pharmacy</h3>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-admin-pharmacy')">&times;</button>
+            </div>
+            <form id="admin-pharma-form" onsubmit="handleAdminPharmacySubmit(event)">
+                <input type="hidden" id="admin-pharma-id" value="">
+                <div class="modal-body">
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Pharmacy / Branch Name *</label>
+                            <input type="text" id="admin-pharma-name" placeholder="e.g. Lazz Pharma (Dhanmondi Branch)" required>
+                        </div>
+                        <div class="input-group">
+                            <label>City Zone / Area *</label>
+                            <input type="text" id="admin-pharma-area" placeholder="e.g. Dhanmondi, Gulshan 2, Mirpur 10" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Physical Street Address *</label>
+                        <input type="text" id="admin-pharma-address" placeholder="e.g. House 41, Road 2, Dhanmondi, Dhaka" required>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Contact Phone / Hotline *</label>
+                            <input type="tel" id="admin-pharma-phone" placeholder="e.g. +880 1711-002233" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Custom ID Code (Optional)</label>
+                            <input type="text" id="admin-pharma-custom-id" placeholder="Auto-generated if empty">
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row">
+                        <div class="input-group">
+                            <label>Latitude Coordinates</label>
+                            <input type="number" step="0.000001" id="admin-pharma-lat" placeholder="23.7461">
+                        </div>
+                        <div class="input-group">
+                            <label>Longitude Coordinates</label>
+                            <input type="number" step="0.000001" id="admin-pharma-lng" placeholder="90.3742">
+                        </div>
+                    </div>
+
+                    <div class="admin-form-row" style="margin-top: 8px;">
+                        <div class="input-group checkbox-group">
+                            <label class="custom-checkbox-label">
+                                <input type="checkbox" id="admin-pharma-24h" checked>
+                                <span>24/7 Open (Round-the-clock)</span>
+                            </label>
+                        </div>
+                        <div class="input-group checkbox-group">
+                            <label class="custom-checkbox-label">
+                                <input type="checkbox" id="admin-pharma-emergency" checked>
+                                <span>Emergency Dispatch Available</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-admin-pharmacy')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-admin-pharma-submit">Save Partner Pharmacy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="config.js?v=2.0"></script>
+    <script src="app.js?v=5.1"></script>
 </body>
 </html>
 

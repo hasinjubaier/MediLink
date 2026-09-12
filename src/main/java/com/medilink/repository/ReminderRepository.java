@@ -10,4 +10,7 @@ import java.util.List;
 public interface ReminderRepository extends JpaRepository<Reminder, String> {
     List<Reminder> findByPatientEmailIgnoreCaseAndActiveTrue(String patientEmail);
     List<Reminder> findByActiveTrue();
+    List<Reminder> findByPatientEmailIgnoreCaseOrderByReminderTimeAsc(String patientEmail);
+    List<Reminder> findByPatientIdOrPatientEmailIgnoreCaseOrderByReminderTimeAsc(String patientId, String patientEmail);
+    List<Reminder> findAllByOrderByReminderTimeAsc();
 }

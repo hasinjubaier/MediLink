@@ -55,19 +55,22 @@
 | Module | Features & Capabilities | Underlying Technology |
 | :--- | :--- | :--- |
 | **Multi-Role Portal** | Distinct dashboard layouts, permissions, and metric summaries for **Patients**, **Pharmacists**, and **Administrators**. | Factory Pattern, Polymorphic JPA |
+| **Admin Dashboard & Telemetry** | Centralized platform governance: live JVM memory telemetry (heap MB, CPU cores, uptime), full User CRUD, Medicine Catalog management, and global emergency broadcast. | Spring Boot Actuator metrics, JPA, SSE |
+| **Partner Pharmacy Network** | Complete administrative lifecycle management (Registration, Area Coverage, 24/7 Hours, Emergency Dispatch, Stock cascade cleanup). | Spring Data JPA, Cascade Operations |
 | **Smart Medicine Finder** | Search brand names, generic formulations, and identify therapeutic alternatives across major Bangladeshi pharmaceuticals (Beximco, Square, Incepta, Renata, Acme). | Strategy Pattern (`MedicineSearchStrategy`) |
 | **Cross-Pharmacy Price Comparison** | Compares retail prices across verified Dhaka pharmacies (Lazz Pharma, Tamanna, Green Pharma, etc.) and highlights best savings. | Strategy Pattern (`PriceSearchStrategy`) |
 | **Drug-Drug Interaction Engine** | Evaluates contraindications, synergistic toxicity, and duplicate therapies in both **Standard Warning** and **Clinical Strict** modes. | Strategy Pattern (`InteractionCheckStrategy`) |
 | **Digital Prescription Scanner** | Browser-side client OCR using **Tesseract.js v5**, automated medicine token extraction, manual doctor/clinic overrides, and attached **Audio Voice Memos** (Web Audio API / MediaRecorder). | Tesseract.js, Regex Tokenizer, HTML5 Audio |
-| **Prescription Lifecycle Workflow** | Multi-phase prescription progression: `UPLOADED` $\rightarrow$ `EXTRACTED` $\rightarrow$ `VERIFIED` $\rightarrow$ `DISPENSE_READY` with pharmacist sign-off. | State Pattern (`PrescriptionState`), JPA `@PostLoad` |
+| **Prescription Lifecycle Workflow** | Multi-phase prescription progression: `UPLOADED` $\rightarrow$ `EXTRACTED` $\rightarrow$ `VERIFIED` $\rightarrow$ `DISPENSE_READY` with pharmacist sign-off and administrative compliance auditing. | State Pattern (`PrescriptionState`), JPA `@PostLoad` |
 | **Anti-Counterfeit Medicine Verifier** | DGDA batch code verification, QR/barcode scanning simulation, manufacturer validation, and counterfeit alert generation. | Verification Strategy & Repository Lookup |
 | **Live Pharmacy Inventory** | Pharmacists adjust stock in real-time; changes trigger instant reactive pushes to connected clients without browser refresh. | Observer Pattern, Spring `SseEmitter` |
 | **24/7 Emergency Pharmacy Locator** | Real-time Haversine distance calculations from patient coordinates to open pharmacies across Dhaka, with direct emergency call links. | Haversine Formula, Geolocation API |
-| **Medication & Appointment Reminders** | Daily dosage schedules, frequency configuration (Once, Daily, Twice Daily, Weekly), background daemon polling, and instant test alarm triggers. | Spring `@Scheduled`, `@EnableScheduling` |
+| **Medication Reminders & Pill Tracker** | Interactive dosage adherence: "Take Dose", 15m snooze, 1-click prescription intake parsing (`⚡ Sync`), meal timing, audible chime alarms, and background daemon alerts. | Spring `@Scheduled`, Web Audio API |
 | **24/7 Gemini AI Clinical Assistant** | Context-aware AI chatbot powered by **Google Gemini 1.5 Flash** with multi-lingual auto-detection (Bangla, English, Arabic, Spanish, French, Urdu) and offline **Local Clinical Fallback**. | Strategy Pattern (`AiChatStrategy`), Gemini REST API |
 | **Pharmacist Live Chat** | Real-time consultation chat between patients and licensed pharmacists, with full message history persisted in PostgreSQL. | JPA Persistence, REST API |
+| **Data Portability & Reports** | Instant client-side CSV exports for User Directories, Medicine Inventories, and Partner Pharmacy networks. | Client-side Blob & CSV Generator |
 | **Interactive Help & Support** | Searchable knowledge base, FAQs, and a ticketing system with category selection, severity rating, and file attachments. | Dynamic SPA Subviews |
-| **Modern Glassmorphic UI/UX** | Responsive layouts, dual-panel sliding authentication modal, interactive country flag dial-code selector, password strength meter, and Dark/Light mode with `Ctrl+Shift+D`. | Vanilla CSS Variables, Vanilla JS SPA |
+| **Modern Glassmorphic UI/UX** | Responsive layouts, dual-panel sliding authentication modal, international dial-code selector, password meter, and high-contrast Dark/Light modes. | Vanilla CSS Variables, Vanilla JS SPA |
 
 ---
 
@@ -239,6 +242,7 @@ flowchart TD
             C_SSE["EventStreamController"]
             C_STAT["StatsController"]
             C_PAT["PatientController"]
+            C_ADMIN["AdminController"]
         end
 
         subgraph ServiceLayer["Business & Pattern Services"]
@@ -350,6 +354,24 @@ flowchart TD
 | :--- | :--- | :--- |
 | `GET` | `/api/stats` | Returns real-time usage statistics (active users, pharmacies, prescriptions, reminders) |
 
+### 8. System Administration, Governance & Telemetry (`/api/admin`)
+| Method | Endpoint | Description | Request Body / Query |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/admin/metrics` | Real-time JVM memory (heap MB), CPU cores, server uptime, DB status, and audit log | — |
+| `GET` | `/api/admin/users` | Retrieve complete user directory across all polymorphic roles | — |
+| `POST` | `/api/admin/users` | Administratively provision new user (`PATIENT`, `DOCTOR`, `PHARMACIST`, `ADMIN`) | `{"name": "...", "email": "...", "password": "...", "role": "PHARMACIST", ...}` |
+| `PUT` | `/api/admin/users/{id}` | Update existing user credentials, contact, and role attributes | `{"name": "...", "email": "...", "phone": "..."}` |
+| `DELETE` | `/api/admin/users/{id}` | Deactivate or remove user from database | — |
+| `GET` | `/api/admin/medicines` | Retrieve full medicine master catalog | — |
+| `POST` | `/api/admin/medicines` | Add new medicine with pricing, strength, formulation, and DGDA batch codes | `{"brandName": "...", "genericName": "...", "unitPrice": 12.5, ...}` |
+| `PUT` | `/api/admin/medicines/{id}` | Modify medicine specifications or retail price ceiling | `{"unitPrice": 14.0, ...}` |
+| `DELETE` | `/api/admin/medicines/{id}` | Delete medicine from platform inventory | — |
+| `GET` | `/api/admin/pharmacies` | List partner pharmacies with live inventory stock counts | — |
+| `POST` | `/api/admin/pharmacies` | Register new partner pharmacy with coordinates, 24/7 hours, and emergency delivery | `{"name": "...", "area": "...", "is24Hours": true, "latitude": 23.75, ...}` |
+| `PUT` | `/api/admin/pharmacies/{id}` | Update partner pharmacy details, phone, or service flags | `{"phone": "...", "hasEmergencyDelivery": true}` |
+| `DELETE` | `/api/admin/pharmacies/{id}` | Remove partner pharmacy and cascade cleanup of linked stock | — |
+| `POST` | `/api/admin/broadcast` | Broadcast emergency system announcement to all active SSE client streams | `{"message": "Scheduled server maintenance at 02:00 UTC."}` |
+
 ---
 
 ## 🗄️ Database Schema & Auto-Seeding
@@ -393,34 +415,42 @@ MediLink 2.0 uses **PostgreSQL**. Tables are defined in [`medilink_schema.sql`](
 
 ---
 
-### Running the Application
+### Running the Decoupled Application
 
-#### Option 1: PowerShell Script (Recommended for Windows)
+MediLink 2.0 features a completely separated client-server architecture:
+- **Backend REST API**: Runs on Spring Boot at `http://localhost:8080`
+- **Frontend SPA Client**: Runs independently on Node.js / any static server at `http://localhost:3000`
+
+#### Option 1: Fullstack Parallel Runner (PowerShell)
 ```powershell
 .\run.ps1
 ```
-*The script checks your PostgreSQL service, tests port availability, configures environment variables, and launches the Spring Boot application.*
+*Provides an interactive menu to launch both Backend and Frontend in parallel, or choose an individual component.*
 
-#### Option 2: Windows Batch Script
+#### Option 2: Fullstack Batch Script (Windows CMD)
 ```cmd
 build_and_run.bat
 ```
 
-#### Option 3: Standard Maven Command
-```powershell
-$env:DB_PORT="5433"
-$env:DB_PASSWORD="your_postgres_password"
-mvn spring-boot:run
-```
+#### Option 3: Running Backend & Frontend Individually
+- **Backend REST API (:8080)**:
+  ```powershell
+  .\run-backend.ps1
+  # OR: mvn spring-boot:run
+  ```
+- **Frontend Web Client (:3000)**:
+  ```powershell
+  .\run-frontend.ps1
+  # OR: cd frontend && npm start
+  ```
 
-#### Option 4: Building Production Executable JAR
-```bash
-mvn clean package -DskipTests
-java -jar target/medilink-2.0.0.jar
+#### Connecting to Custom API URLs
+To change the target API host or port, update `frontend/config.js`:
+```javascript
+window.MEDILINK_CONFIG = {
+    API_BASE_URL: 'http://localhost:8080'
+};
 ```
-
-Once started, access the application in your browser:
-👉 **`http://localhost:8080`**
 
 ---
 
@@ -432,7 +462,7 @@ Pre-seeded accounts are available for testing role-specific features:
 | :--- | :--- | :--- | :--- | :--- |
 | **Patient** | Rahim Ahmed | `rahim@medilink.com` | `patient123` | Prescription scanning, price comparison, drug interaction checks, dosage reminders, AI consultation, emergency mode. |
 | **Pharmacist** | Dr. Farhan Kabir | `farhan@lazzpharma.com` | `pharma123` | Prescription verification workflow, stock adjustment with live Observer broadcast, patient chat consultation. |
-| **Administrator** | System Admin | `admin@medilink.com` | `admin123` | System telemetry, user management, audit logs, emergency network monitoring. |
+| **Administrator** | System Admin | `admin@medilink.com` | `admin123` | Live JVM heap & CPU telemetry, full User Directory CRUD, Medicine Catalog management, Partner Pharmacy Network CRUD, emergency SSE broadcast, and CSV exports. |
 
 ---
 
@@ -441,43 +471,50 @@ Pre-seeded accounts are available for testing role-specific features:
 ```
 d:\ACADEMIC CAREER\12th Semester\Advance OOP\Medilink2.0
 ├── pom.xml                                   # Maven dependencies & build configuration
-├── medilink_schema.sql                       # Full PostgreSQL database schema DDL
-├── run.ps1                                   # Automated launch script for PowerShell
-├── build_and_run.bat                         # Automated batch build runner
-├── README.md                                 # Complete project documentation
-├── src
-│   ├── main
-│   │   ├── java
-│   │   │   └── com
-│   │   │       └── medilink
-│   │   │           ├── MedilinkApplication.java  # Spring Boot Main Entrypoint
-│   │   │           ├── config/
-│   │   │           │   ├── DataSeeder.java       # Database seed data initializer
-│   │   │           │   └── WebMvcConfig.java     # CORS & Static resource handler config
-│   │   │           ├── controller/               # 10 REST API Controllers
-│   │   │           ├── model/
-│   │   │           │   ├── chat/ChatMessage.java
-│   │   │           │   ├── medicine/             # Medicine & Decorator pattern classes
-│   │   │           │   ├── observer/             # Observer pattern Subject & Notifiable
-│   │   │           │   ├── pharmacy/             # Pharmacy & PharmacyStock
-│   │   │           │   ├── prescription/         # Prescription & State pattern hierarchy
-│   │   │           │   ├── reminder/             # Reminder entity & frequency enums
-│   │   │           │   ├── strategy/             # Search, Interaction, Verification & AI strategies
-│   │   │           │   └── user/                 # User inheritance hierarchy & UserFactory
-│   │   │           ├── repository/               # Spring Data JPA Repository Interfaces
-│   │   │           └── service/                  # Business logic services & Singletons
-│   │   └── resources
-│   │       ├── application.properties        # Application configuration & DB properties
-│   │       └── static                        # Web SPA Frontend
-│   │           ├── index.html                # Unified Single Page Application UI
-│   │           ├── style.css                 # Glassmorphic responsive styling & theme variables
-│   │           ├── app.js                    # Core frontend controllers, OCR & SSE client
-│   │           └── flags/                    # SVG national flag assets for country selector
-│   └── test
-│       └── java
-│           └── com
-│               └── medilink
-│                   └── MedilinkApplicationTests.java # Context & smoke test suite
+├── database/                                 # Database scripts & schema DDL
+├── run.ps1                                   # Interactive Fullstack PowerShell orchestrator
+├── build_and_run.bat                         # Interactive Batch runner
+├── run-backend.bat / run-backend.ps1         # Standalone Spring Boot Backend launchers (:8080)
+├── run-frontend.bat / run-frontend.ps1       # Standalone Frontend Client launchers (:3000)
+├── README.md                                 # Complete system documentation
+│
+├── frontend/                                 # 🌐 Standalone Frontend Web Application
+│   ├── config.js                             # API Base URL & client runtime configuration
+│   ├── index.html                            # Unified Single Page Application UI
+│   ├── style.css                             # Glassmorphic responsive styling (~9,500 lines)
+│   ├── app.js                                # Core frontend controllers, OCR & SSE client (~6,460 lines)
+│   ├── server.js                             # Zero-dependency Node.js HTTP server (:3000)
+│   ├── package.json                          # Standard npm scripts (start, dev, serve)
+│   ├── flags/                                # SVG national flags for country dial picker
+│   └── README.md                             # Frontend documentation & API guide
+│
+└── src/                                      # ☕ Spring Boot Headless REST Backend
+    ├── main/
+    │   ├── java/com/medilink/
+    │   │   ├── MedilinkApplication.java      # Spring Boot Main Entrypoint
+    │   │   ├── config/
+    │   │   │   ├── CorsConfig.java           # Global CORS Configuration (All origins & SSE)
+    │   │   │   └── DataSeeder.java           # Database seed data initializer
+    │   │   ├── controller/                   # 12 REST API Controllers (Root, Auth, Admin, Meds, etc.)
+    │   │   │   ├── RootController.java       # Health & discovery endpoint at GET /
+    │   │   │   ├── AuthController.java       # Authentication & public registration endpoints
+    │   │   │   ├── AdminController.java      # Platform governance, telemetry, user/pharma/med CRUD
+    │   │   │   ├── MedicineController.java
+    │   │   │   ├── PrescriptionController.java
+    │   │   │   ├── PharmacyController.java
+    │   │   │   ├── ReminderController.java
+    │   │   │   ├── ChatController.java
+    │   │   │   ├── AiController.java
+    │   │   │   ├── EventStreamController.java
+    │   │   │   ├── StatsController.java
+    │   │   │   └── PatientController.java
+    │   │   ├── model/                        # Domain models, Strategy, Decorator & State patterns
+    │   │   ├── repository/                   # Spring Data JPA Repository Interfaces
+    │   │   └── service/                      # Business logic services & Singletons
+    │   └── resources/
+    │       ├── application.properties        # Application & database properties
+    │       └── static/                       # Bundled static resources (synced fallback)
+    └── test/                                 # Automated test suite
 ```
 
 ---
@@ -512,6 +549,15 @@ mvn test
 6. **Gemini AI Healthcare Chatbot**:
    - Type a query in English, Bengali (*"আমার মাথায় খুব ব্যথা, কি ওষুধ খাবো?"*), or Arabic.
    - Verify the model detects the language and responds in the same language.
+7. **Admin Dashboard, Telemetry & Pharmacy Network**:
+   - Sign in as Admin (`admin@medilink.com` / `admin123`).
+   - Automatically lands on **📊 Admin Dashboard** at the top of the feature list.
+   - Inspect live JVM memory telemetry (heap MB, CPU processor cores, PostgreSQL uptime).
+   - Navigate to **Pharmacy Network & Licenses**: add a partner pharmacy, inspect badges, and test data export via **Export CSV**.
+   - Navigate to **Prescription Compliance & Audit** to review prescription audit trails.
+8. **Security Hardening (RBAC)**:
+   - Notice the public Sign-Up modal strictly excludes the Admin role.
+   - Attempting to register with `role: "ADMIN"` via `POST /api/auth/register` returns `HTTP 403 Forbidden`.
 
 ---
 

@@ -36,9 +36,25 @@ public class ChatMessage {
     @Column(name = "sent_at")
     private LocalDateTime timestamp;
 
+    @Column(name = "sender_email", length = 120)
+    private String senderEmail;
+
+    @Column(name = "receiver_email", length = 120)
+    private String receiverEmail;
+
+    @Column(name = "prescription_id", length = 50)
+    private String prescriptionId;
+
+    @Column(name = "prescription_summary", columnDefinition = "TEXT")
+    private String prescriptionSummary;
+
+    @Column(name = "is_read")
+    private Boolean isRead = false;
+
     public ChatMessage() {
         this.timestamp = LocalDateTime.now();
         this.messageType = "TEXT";
+        this.isRead = false;
     }
 
     public ChatMessage(String senderId, String senderName, String senderRole,
@@ -50,6 +66,17 @@ public class ChatMessage {
         this.content = content;
         this.messageType = messageType != null ? messageType : "TEXT";
         this.timestamp = LocalDateTime.now();
+        this.isRead = false;
+    }
+
+    public ChatMessage(String senderId, String senderName, String senderRole, String senderEmail,
+                       String receiverId, String receiverEmail, String content, String messageType,
+                       String prescriptionId, String prescriptionSummary) {
+        this(senderId, senderName, senderRole, receiverId, content, messageType);
+        this.senderEmail = senderEmail;
+        this.receiverEmail = receiverEmail;
+        this.prescriptionId = prescriptionId;
+        this.prescriptionSummary = prescriptionSummary;
     }
 
     public ChatMessage(String legacyId, String senderId, String senderName, String senderRole,
@@ -85,4 +112,19 @@ public class ChatMessage {
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public String getSenderEmail() { return senderEmail; }
+    public void setSenderEmail(String senderEmail) { this.senderEmail = senderEmail; }
+
+    public String getReceiverEmail() { return receiverEmail; }
+    public void setReceiverEmail(String receiverEmail) { this.receiverEmail = receiverEmail; }
+
+    public String getPrescriptionId() { return prescriptionId; }
+    public void setPrescriptionId(String prescriptionId) { this.prescriptionId = prescriptionId; }
+
+    public String getPrescriptionSummary() { return prescriptionSummary; }
+    public void setPrescriptionSummary(String prescriptionSummary) { this.prescriptionSummary = prescriptionSummary; }
+
+    public Boolean getIsRead() { return isRead != null ? isRead : false; }
+    public void setIsRead(Boolean read) { isRead = read; }
 }

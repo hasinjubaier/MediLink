@@ -63,6 +63,7 @@ public class MedicineService {
         if (!medOpt.isPresent()) return Collections.emptyList();
 
         Medicine target = medOpt.get();
+        if (target.getGenericName() == null || target.getGenericName().trim().isEmpty()) return Collections.emptyList();
         List<Medicine> candidates = medicineRepository.findByGenericNameIgnoreCase(target.getGenericName());
         List<Medicine> alternatives = new ArrayList<>();
         for (Medicine m : candidates) {
@@ -71,6 +72,16 @@ public class MedicineService {
             }
         }
         return alternatives;
+    }
+
+    public int getTotalStockQuantity(String medicineId) {
+        if (medicineId == null) return 0;
+        List<PharmacyStock> stocks = pharmacyStockRepository.searchStocksByMedicine(medicineId);
+        int total = 0;
+        for (PharmacyStock s : stocks) {
+            total += s.getQuantity();
+        }
+        return total;
     }
 
     public List<Map<String, Object>> getPharmacyPrices(String medicineId, Double userLat, Double userLng) {
@@ -173,5 +184,63 @@ public class MedicineService {
             "CRITICAL: Scanned code " + cleanCode + " has NO matching manufacturer record in the Directorate General of Drug Administration (DGDA) database.",
             "Unidentified / Unauthorized Source"
         );
+    }
+
+    @Transactional
+    public Medicine saveMedicine(Medicine medicine) {
+        if (medicine.getId() == null || medicine.getId().trim().isEmpty()) {
+            medicine.setId("med_" + System.currentTimeMillis());
+        }
+        return medicineRepository.save(medicine);
+    }
+
+    @Transactional
+    public Medicine updateMedicine(String id, Map<String, Object> updates) {
+        Medicine med = medicineRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Medicine not found with ID: " + id));
+
+        if (updates.containsKey("brandName") && updates.get("brandName") != null) {
+            med.setBrandName(((String) updates.get("brandName")).trim());
+        }
+        if (updates.containsKey("genericName") && updates.get("genericName") != null) {
+            med.setGenericName(((String) updates.get("genericName")).trim());
+        }
+        if (updates.containsKey("company") && updates.get("company") != null) {
+            med.setCompany(((String) updates.get("company")).trim());
+        }
+        if (updates.containsKey("strength") && updates.get("strength") != null) {
+            med.setStrength(((String) updates.get("strength")).trim());
+        }
+        if (updates.containsKey("formulation") && updates.get("formulation") != null) {
+            med.setFormulation(((String) updates.get("formulation")).trim());
+        }
+        if (updates.containsKey("unitPrice") && updates.get("unitPrice") != null) {
+            Object p = updates.get("unitPrice");
+            if (p instanceof Number) med.setUnitPrice(((Number) p).doubleValue());
+            else if (p instanceof String) {
+                try { med.setUnitPrice(Double.parseDouble((String) p)); } catch (Exception ignored) {}
+            }
+        }
+        if (updates.containsKey("category") && updates.get("category") != null) {
+            med.setCategory(((String) updates.get("category")).trim());
+        }
+        if (updates.containsKey("sideEffects") && updates.get("sideEffects") != null) {
+            med.setSideEffects((String) updates.get("sideEffects"));
+        }
+        if (updates.containsKey("prescriptionRequired") && updates.get("prescriptionRequired") != null) {
+            Object pr = updates.get("prescriptionRequired");
+            if (pr instanceof Boolean) med.setPrescriptionRequired((Boolean) pr);
+            else if (pr instanceof String) med.setPrescriptionRequired(Boolean.parseBoolean((String) pr));
+        }
+
+        return medicineRepository.save(med);
+    }
+
+    @Transactional
+    public boolean deleteMedicine(String id) {
+        if (id == null || id.trim().isEmpty()) return false;
+        if (!medicineRepository.existsById(id.trim())) return false;
+        medicineRepository.deleteById(id.trim());
+        return true;
     }
 }

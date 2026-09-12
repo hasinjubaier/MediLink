@@ -106,6 +106,39 @@ public class DataSeeder implements CommandLineRunner {
             addMed("med_14", "Fexo 120", "Fexofenadine", "Square Pharmaceuticals", "120mg", "Tablet", 9.00, false, "Antihistamine", "Drowsiness (rare)", Arrays.asList("SQR-FEX-121"));
 
             System.out.println("[DataSeeder] Seeded 14 default medicines with authentic DGDA batch codes.");
+        } else {
+            ensureBatchData();
+        }
+    }
+
+    private void ensureBatchData() {
+        Map<String, List<String>> batchMap = new HashMap<>();
+        batchMap.put("med_01", Arrays.asList("BEX-2026-A1", "BEX-2026-A2", "BATCH-NAPA-99"));
+        batchMap.put("med_02", Arrays.asList("SQR-ACE-101", "SQR-ACE-102"));
+        batchMap.put("med_03", Arrays.asList("INC-RES-550"));
+        batchMap.put("med_04", Arrays.asList("ACM-FST-881"));
+        batchMap.put("med_05", Arrays.asList("SQR-SEC-201", "SQR-SEC-202"));
+        batchMap.put("med_06", Arrays.asList("REN-MAX-901", "REN-MAX-902"));
+        batchMap.put("med_07", Arrays.asList("HCL-SRG-404"));
+        batchMap.put("med_08", Arrays.asList("SKF-LOS-303"));
+        batchMap.put("med_09", Arrays.asList("SQR-AZI-771"));
+        batchMap.put("med_10", Arrays.asList("BEX-ZIM-662"));
+        batchMap.put("med_11", Arrays.asList("SQR-CIP-501"));
+        batchMap.put("med_12", Arrays.asList("ACM-MON-101", "ACM-MON-102"));
+        batchMap.put("med_13", Arrays.asList("SQR-ODM-331"));
+        batchMap.put("med_14", Arrays.asList("SQR-FEX-121"));
+
+        for (Map.Entry<String, List<String>> entry : batchMap.entrySet()) {
+            Optional<Medicine> mOpt = medicineRepository.findById(entry.getKey());
+            if (mOpt.isPresent()) {
+                Medicine m = mOpt.get();
+                if (m.getVerifiedBatches() == null || m.getVerifiedBatches().isEmpty()) {
+                    for (String b : entry.getValue()) {
+                        m.addVerifiedBatch(b);
+                    }
+                    medicineRepository.save(m);
+                }
+            }
         }
     }
 
@@ -180,10 +213,50 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedChatMessages() {
         if (chatMessageRepository.count() == 0) {
-            chatMessageRepository.save(new ChatMessage("ML-9824-A", "Rahim Ahmed", "PATIENT", "usr_pharma_01", "Assalamu Alaikum. Is Maxpro 20 available for delivery in Dhanmondi?", "TEXT"));
-            chatMessageRepository.save(new ChatMessage("usr_pharma_01", "Dr. Farhan Kabir", "PHARMACIST", "ML-9824-A", "Walaikum Assalam. Maxpro 20 has low stock (4 units), but we also have Sergel 20 (Esomeprazole) in full supply.", "TEXT"));
+            ChatMessage m1 = new ChatMessage("ML-9824-A", "Rahim Ahmed", "PATIENT", "rahim@medilink.com",
+                    "usr_pharma_01", "farhan@lazzpharma.com",
+                    "Assalamu Alaikum Dr. Farhan. I have attached my prescription from DMCH. Is Maxpro 20 available for delivery in Dhanmondi?",
+                    "TEXT", "rx_101", "Tab Napa Extra 500mg, Cap Seclo 20mg, Tab Monas 10mg");
+            m1.setIsRead(true);
+            chatMessageRepository.save(m1);
 
-            System.out.println("[DataSeeder] Seeded initial chat messages.");
+            ChatMessage m2 = new ChatMessage("usr_pharma_01", "Dr. Farhan Kabir", "PHARMACIST", "farhan@lazzpharma.com",
+                    "ML-9824-A", "rahim@medilink.com",
+                    "Walaikum Assalam Mr. Rahim. Yes, prescription rx_101 is verified. Maxpro 20 is available, and we also have Sergel 20 (Esomeprazole) in fresh DGDA batch stock. Remember to take your PPI 30 minutes before breakfast.",
+                    "CLINICAL_ADVICE", "rx_101", null);
+            m2.setIsRead(true);
+            chatMessageRepository.save(m2);
+
+            ChatMessage m3 = new ChatMessage("ML-9824-A", "Rahim Ahmed", "PATIENT", "rahim@medilink.com",
+                    "usr_pharma_01", "farhan@lazzpharma.com",
+                    "Thank you doctor. Can I take Napa Extra at the same time if fever spikes?",
+                    "TEXT", null, null);
+            m3.setIsRead(true);
+            chatMessageRepository.save(m3);
+
+            ChatMessage m4 = new ChatMessage("usr_pharma_01", "Dr. Farhan Kabir", "PHARMACIST", "farhan@lazzpharma.com",
+                    "ML-9824-A", "rahim@medilink.com",
+                    "Yes, Napa Extra can be taken with or after meals. Maintain at least a 4-hour gap between doses and do not exceed 4 tablets in 24 hours.",
+                    "CLINICAL_ADVICE", null, null);
+            m4.setIsRead(true);
+            chatMessageRepository.save(m4);
+
+            // Consultation Thread 2: Dr. Nazmul Huda (Popular Pharmacy)
+            ChatMessage n1 = new ChatMessage("ML-9824-A", "Rahim Ahmed", "PATIENT", "rahim@medilink.com",
+                    "usr_pharma_02", "nazmul@popularpharma.com",
+                    "Assalamu Alaikum Dr. Nazmul. Does Popular Pharmacy Gulshan 2 have Azithrocin 500 in stock?",
+                    "TEXT", null, null);
+            n1.setIsRead(true);
+            chatMessageRepository.save(n1);
+
+            ChatMessage n2 = new ChatMessage("usr_pharma_02", "Dr. Nazmul Huda", "PHARMACIST", "nazmul@popularpharma.com",
+                    "ML-9824-A", "rahim@medilink.com",
+                    "Walaikum Assalam Mr. Rahim. Dr. Nazmul Huda here at Popular Pharmacy Gulshan 2. Yes, Azithrocin 500 (Beximco) is in stock. Remember to complete the full 5-day antibiotic course as prescribed.",
+                    "CLINICAL_ADVICE", null, null);
+            n2.setIsRead(true);
+            chatMessageRepository.save(n2);
+
+            System.out.println("[DataSeeder] Seeded rich initial chat messages for multiple pharmacists.");
         }
     }
 

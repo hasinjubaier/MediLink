@@ -1,7 +1,9 @@
 package com.medilink.controller;
 
+import com.medilink.model.medicine.Medicine;
 import com.medilink.model.prescription.Prescription;
 import com.medilink.model.prescription.PrescriptionItem;
+import com.medilink.service.MedicineService;
 import com.medilink.service.PrescriptionService;
 import com.medilink.service.StockObserverService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +18,13 @@ import java.util.*;
 public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
+    private final MedicineService medicineService;
     private final StockObserverService stockObserverService;
 
     @Autowired
-    public PrescriptionController(PrescriptionService prescriptionService) {
+    public PrescriptionController(PrescriptionService prescriptionService, MedicineService medicineService) {
         this.prescriptionService = prescriptionService;
+        this.medicineService = medicineService;
         this.stockObserverService = StockObserverService.getInstance();
     }
 
@@ -61,7 +65,10 @@ public class PrescriptionController {
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> uploadPrescription(@RequestBody Map<String, String> data) {
-        String patientId = data.getOrDefault("patientId", "usr_patient_01");
+        String patientId = data.get("patientId");
+        if (patientId == null || "usr_patient_01".equals(patientId) || patientId.trim().isEmpty()) {
+            patientId = "ML-9824-A";
+        }
         String patientName = data.getOrDefault("patientName", "Rahim Ahmed");
         String doctor = data.getOrDefault("doctorName", "Dr. S. K. Roy");
         String hospital = data.getOrDefault("hospital", "Square Hospital Dhaka");
@@ -71,8 +78,28 @@ public class PrescriptionController {
         if (voiceAudio == null) voiceAudio = data.get("voiceNote");
 
         List<PrescriptionItem> items = new ArrayList<>();
-        items.add(new PrescriptionItem("med_01", "Napa Extra", "Paracetamol + Caffeine", "500mg", "1+1+1", "5 days", "For fever and pain"));
-        items.add(new PrescriptionItem("med_05", "Seclo 20", "Omeprazole", "20mg", "1+0+1", "7 days", "Before meals"));
+        if (rawText != null && !rawText.trim().isEmpty()) {
+            String lowerScan = rawText.toLowerCase();
+            List<Medicine> catalog = medicineService.findAll();
+            for (Medicine m : catalog) {
+                if (lowerScan.contains(m.getBrandName().toLowerCase()) || lowerScan.contains(m.getGenericName().toLowerCase())) {
+                    items.add(new PrescriptionItem(
+                        m.getId(),
+                        m.getBrandName(),
+                        m.getGenericName(),
+                        m.getStrength(),
+                        "1+0+1",
+                        "7 days",
+                        "Take as clinically prescribed"
+                    ));
+                }
+            }
+        }
+
+        if (items.isEmpty()) {
+            items.add(new PrescriptionItem("med_01", "Napa Extra", "Paracetamol + Caffeine", "500mg", "1+1+1", "5 days", "For fever and pain"));
+            items.add(new PrescriptionItem("med_05", "Seclo 20", "Omeprazole", "20mg", "1+0+1", "7 days", "Before meals"));
+        }
 
         Prescription rx = prescriptionService.createPrescription(patientId, patientName, doctor, hospital, rawText, items);
         if (voiceAudio != null && !voiceAudio.trim().isEmpty()) {
@@ -104,6 +131,28 @@ public class PrescriptionController {
 
             stockObserverService.onNotification("PRESCRIPTION_VERIFIED",
                     "Prescription " + rx.getId() + " verified by Pharmacist. Status: " + rx.getStatus());
+
+            response.put("status", "SUCCESS");
+            response.put("newStatus", rx.getStatus());
+            response.put("dispenseReady", rx.isDispenseReady());
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("status", "ERROR");
+            response.put("message", "Prescription not found");
+            return ResponseEntity.status(404).body(response);
+        }
+    }
+
+    @PostMapping("/revert")
+    public ResponseEntity<Map<String, Object>> revertWorkflow(@RequestBody Map<String, String> data) {
+        String rxId = data.get("prescriptionId");
+        Optional<Prescription> updated = prescriptionService.revertWorkflow(rxId);
+
+        Map<String, Object> response = new HashMap<>();
+        if (updated.isPresent()) {
+            Prescription rx = updated.get();
+            stockObserverService.onNotification("PRESCRIPTION_REVERTED",
+                    "Prescription " + rx.getId() + " reverted. Status: " + rx.getStatus());
 
             response.put("status", "SUCCESS");
             response.put("newStatus", rx.getStatus());

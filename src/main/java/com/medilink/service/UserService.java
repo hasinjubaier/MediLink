@@ -95,7 +95,23 @@ public class UserService {
         }
     }
 
-    public String generateAndSendOtp(String email) {
+    public static class OtpDispatchResult {
+        private final String code;
+        private final boolean liveEmailSent;
+        private final String message;
+
+        public OtpDispatchResult(String code, boolean liveEmailSent, String message) {
+            this.code = code;
+            this.liveEmailSent = liveEmailSent;
+            this.message = message;
+        }
+
+        public String getCode() { return code; }
+        public boolean isLiveEmailSent() { return liveEmailSent; }
+        public String getMessage() { return message; }
+    }
+
+    public OtpDispatchResult generateAndSendOtpDetails(String email) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email is required.");
         }
@@ -104,18 +120,35 @@ public class UserService {
         String code = String.valueOf(codeNum);
         otpStore.put(cleanEmail, new OtpRecord(code, LocalDateTime.now().plusMinutes(5)));
 
-        // Try to send via EmailService if configured
-        try {
-            if (emailService.isConfigured()) {
+        boolean liveSent = false;
+        String message;
+
+        if (emailService.isConfigured()) {
+            try {
                 emailService.sendOtpEmail(cleanEmail, code);
+                liveSent = true;
+                message = "Live verification code sent to " + cleanEmail;
+            } catch (Exception e) {
+                System.err.println("[UserService] Failed to send live email via SMTP: " + e.getMessage());
+                message = "SMTP delivery error (" + e.getMessage() + "). Demo code generated for testing.";
             }
-        } catch (Exception e) {
-            System.err.println("[UserService] Could not send live email: " + e.getMessage());
+        } else {
+            message = "Live Gmail SMTP not configured in medilink_config.properties. Demo code generated for testing.";
+            System.out.println("[UserService] Live Gmail SMTP not configured. Simulating OTP code: " + code);
         }
-        return code;
+
+        return new OtpDispatchResult(code, liveSent, message);
+    }
+
+    public String generateAndSendOtp(String email) {
+        return generateAndSendOtpDetails(email).getCode();
     }
 
     public boolean verifyOtp(String email, String inputOtp) {
+        return verifyOtp(email, inputOtp, true);
+    }
+
+    public boolean verifyOtp(String email, String inputOtp, boolean consumeOnSuccess) {
         if (email == null || inputOtp == null) return false;
         String cleanEmail = email.trim().toLowerCase();
         OtpRecord record = otpStore.get(cleanEmail);
@@ -125,10 +158,38 @@ public class UserService {
             return false;
         }
         boolean match = record.code.equals(inputOtp.trim());
-        if (match) {
+        if (match && consumeOnSuccess) {
             otpStore.remove(cleanEmail);
         }
         return match;
+    }
+
+    public boolean resetPassword(String email, String otp, String newPassword) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email is required.");
+        }
+        if (otp == null || otp.trim().isEmpty()) {
+            throw new IllegalArgumentException("OTP verification code is required.");
+        }
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            throw new IllegalArgumentException("New password must be at least 6 characters long.");
+        }
+
+        String cleanEmail = email.trim().toLowerCase();
+        boolean validOtp = verifyOtp(cleanEmail, otp.trim(), true);
+        if (!validOtp) {
+            throw new IllegalArgumentException("Invalid or expired OTP verification code.");
+        }
+
+        Optional<User> userOpt = userRepository.findByEmailIgnoreCase(cleanEmail);
+        if (!userOpt.isPresent()) {
+            throw new IllegalArgumentException("User with email " + cleanEmail + " not found.");
+        }
+
+        User user = userOpt.get();
+        user.setPasswordHash(newPassword.trim());
+        userRepository.save(user);
+        return true;
     }
 
     public User updateProfile(String id, Map<String, Object> updateData) {
@@ -211,8 +272,50 @@ public class UserService {
                 } catch (Exception ignored) {}
             }
             return patientRepository.save(patient);
+        } else if (user instanceof Pharmacist) {
+            Pharmacist pharmacist = (Pharmacist) user;
+            if (updateData.containsKey("pharmacyId")) {
+                pharmacist.setPharmacyId((String) updateData.get("pharmacyId"));
+            }
+            if (updateData.containsKey("pharmacyName")) {
+                pharmacist.setPharmacyName((String) updateData.get("pharmacyName"));
+            }
+            if (updateData.containsKey("licenseNumber")) {
+                pharmacist.setLicenseNumber((String) updateData.get("licenseNumber"));
+            }
+            return pharmacistRepository.save(pharmacist);
+        } else if (user instanceof Admin) {
+            Admin admin = (Admin) user;
+            if (updateData.containsKey("accessLevel")) {
+                Object lvl = updateData.get("accessLevel");
+                if (lvl instanceof Number) admin.setAccessLevel(((Number) lvl).intValue());
+                else if (lvl instanceof String) {
+                    try { admin.setAccessLevel(Integer.parseInt((String) lvl)); } catch (Exception ignored) {}
+                }
+            }
+            return adminRepository.save(admin);
         } else {
             return userRepository.save(user);
         }
+    }
+
+    public User adminUpdateUser(String id, Map<String, Object> updateData) {
+        User user = updateProfile(id, updateData);
+        if (updateData.containsKey("password") && updateData.get("password") != null) {
+            String newPass = ((String) updateData.get("password")).trim();
+            if (!newPass.isEmpty()) {
+                user.setPasswordHash(newPass);
+                return userRepository.save(user);
+            }
+        }
+        return user;
+    }
+
+    public boolean deleteUser(String id) {
+        if (id == null || id.trim().isEmpty()) return false;
+        Optional<User> userOpt = userRepository.findById(id.trim());
+        if (!userOpt.isPresent()) return false;
+        userRepository.deleteById(id.trim());
+        return true;
     }
 }

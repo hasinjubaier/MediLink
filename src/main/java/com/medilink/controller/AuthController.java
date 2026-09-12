@@ -78,6 +78,12 @@ public class AuthController {
 
         try {
             UserRole role = UserRole.valueOf(roleStr.toUpperCase());
+            if (role == UserRole.ADMIN) {
+                Map<String, Object> errResp = new HashMap<>();
+                errResp.put("status", "ERROR");
+                errResp.put("message", "Administrator accounts cannot be self-registered publicly. Contact system administration.");
+                return ResponseEntity.status(403).body(errResp);
+            }
             User newUser = userService.registerUser(role, name, email, password, body);
             Map<String, Object> resp = new HashMap<>();
             resp.put("status", "SUCCESS");
@@ -95,12 +101,30 @@ public class AuthController {
     @PostMapping("/send-otp")
     public ResponseEntity<Map<String, Object>> sendOtp(@RequestBody Map<String, String> body) {
         String email = body.get("email");
+        String purpose = body.get("purpose");
         try {
-            String code = userService.generateAndSendOtp(email);
+            if (email == null || email.trim().isEmpty()) {
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("status", "ERROR");
+                resp.put("message", "Email address is required.");
+                return ResponseEntity.badRequest().body(resp);
+            }
+
+            if ("RESET_PASSWORD".equalsIgnoreCase(purpose)) {
+                if (!userService.findByEmail(email).isPresent()) {
+                    Map<String, Object> resp = new HashMap<>();
+                    resp.put("status", "ERROR");
+                    resp.put("message", "No account registered with " + email + ". Please check your email or Sign Up.");
+                    return ResponseEntity.badRequest().body(resp);
+                }
+            }
+
+            UserService.OtpDispatchResult result = userService.generateAndSendOtpDetails(email);
             Map<String, Object> resp = new HashMap<>();
             resp.put("status", "SUCCESS");
-            resp.put("message", "OTP sent successfully");
-            resp.put("otp", code); // Included for convenient testing
+            resp.put("message", result.getMessage());
+            resp.put("liveEmailSent", result.isLiveEmailSent());
+            resp.put("otp", result.getCode()); // Available for convenient testing and fallback
             return ResponseEntity.ok(resp);
         } catch (Exception e) {
             Map<String, Object> resp = new HashMap<>();
@@ -114,7 +138,7 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody Map<String, String> body) {
         String email = body.get("email");
         String otp = body.get("otp");
-        boolean valid = userService.verifyOtp(email, otp);
+        boolean valid = userService.verifyOtp(email, otp, false);
 
         Map<String, Object> resp = new HashMap<>();
         if (valid) {
@@ -125,5 +149,25 @@ public class AuthController {
             resp.put("message", "Invalid or expired OTP");
         }
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String otp = body.get("otp");
+        String newPassword = body.get("newPassword");
+
+        try {
+            userService.resetPassword(email, otp, newPassword);
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("status", "SUCCESS");
+            resp.put("message", "Password has been reset successfully. You may now log in with your new password.");
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("status", "ERROR");
+            resp.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(resp);
+        }
     }
 }

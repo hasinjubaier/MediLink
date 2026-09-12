@@ -42,11 +42,21 @@ public class Reminder {
     @Column(name = "is_active")
     private boolean active = true;
 
+    @Column(name = "last_taken_date", length = 50)
+    private String lastTakenDate;
+
+    @Column(name = "category", length = 30)
+    private String category = "MEDICATION";
+
+    @Column(name = "meal_timing", length = 50)
+    private String mealTiming = "AFTER_MEAL";
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     public Reminder() {
         this.active = true;
+        this.category = "MEDICATION";
         this.createdAt = LocalDateTime.now();
     }
 
@@ -61,6 +71,7 @@ public class Reminder {
         this.frequency = frequency;
         this.instructions = instructions;
         this.active = true;
+        this.category = "MEDICATION";
         this.createdAt = LocalDateTime.now();
     }
 
@@ -90,6 +101,15 @@ public class Reminder {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public String getLastTakenDate() { return lastTakenDate; }
+    public void setLastTakenDate(String lastTakenDate) { this.lastTakenDate = lastTakenDate; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
+    public String getMealTiming() { return mealTiming; }
+    public void setMealTiming(String mealTiming) { this.mealTiming = mealTiming; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

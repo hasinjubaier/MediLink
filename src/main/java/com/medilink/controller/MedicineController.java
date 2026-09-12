@@ -46,8 +46,9 @@ public class MedicineController {
             if (m.getBrandName().startsWith("Napa") || m.getBrandName().startsWith("Ace") || m.getBrandName().startsWith("Seclo")) {
                 decorated = new VerifiedBadgeDecorator(decorated, "DGDA-BD-VERIFIED");
             }
-            if (m.getUnitPrice() < 5.0) {
-                decorated = new LowStockBadgeDecorator(decorated, 8);
+            int stockQty = medicineService.getTotalStockQuantity(m.getId());
+            if (stockQty > 0 && stockQty <= 15) {
+                decorated = new LowStockBadgeDecorator(decorated, stockQty);
             }
 
             Map<String, Object> map = new HashMap<>();
@@ -78,7 +79,7 @@ public class MedicineController {
         List<Medicine> all = medicineService.findAll();
         List<Medicine> matching = new ArrayList<>();
         for (Medicine m : all) {
-            if (generic != null && !generic.isEmpty() && m.getGenericName().toLowerCase().contains(generic.toLowerCase())) {
+            if (generic != null && !generic.isEmpty() && m.getGenericName() != null && m.getGenericName().toLowerCase().contains(generic.toLowerCase())) {
                 matching.add(m);
             }
         }
@@ -119,7 +120,7 @@ public class MedicineController {
         if (!medOpt.isPresent()) {
             List<Medicine> all = medicineService.findAll();
             for (Medicine m : all) {
-                if (m.getBrandName().equalsIgnoreCase(target) || m.getBrandName().toLowerCase().contains(target.toLowerCase())) {
+                if (m.getBrandName() != null && (m.getBrandName().equalsIgnoreCase(target) || m.getBrandName().toLowerCase().contains(target.toLowerCase()))) {
                     medOpt = Optional.of(m);
                     break;
                 }
@@ -175,6 +176,7 @@ public class MedicineController {
         response.put("status", "SUCCESS");
         response.put("mode", result.get("strategy"));
         response.put("analysis", result.get("analysis"));
+        response.put("hasHighRisk", result.get("hasHighRisk"));
         return ResponseEntity.ok(response);
     }
 

@@ -18,10 +18,10 @@ import java.util.Properties;
  */
 public class EmailService {
 
-    // ── CONFIGURE THESE TWO LINES ──────────────────────────
-    private static final String SENDER_EMAIL       = "your_gmail@gmail.com";   // <-- your Gmail
-    private static final String SENDER_APP_PASSWORD = "xxxx xxxx xxxx xxxx";   // <-- App Password
-    // ───────────────────────────────────────────────────────
+    // ── FALLBACK CREDENTIALS ──────────────────────────────────
+    private static final String SENDER_EMAIL       = "your_gmail@gmail.com";
+    private static final String SENDER_APP_PASSWORD = "xxxx xxxx xxxx xxxx";
+    // ──────────────────────────────────────────────────────────
 
     private static final String SMTP_HOST = "smtp.gmail.com";
     private static final int    SMTP_PORT = 587;
@@ -35,42 +35,102 @@ public class EmailService {
         return instance;
     }
 
+    public String resolveSenderEmail() {
+        // 1. Environment variables
+        String env = System.getenv("MAIL_USERNAME");
+        if (env != null && !env.trim().isEmpty()) return env.trim();
+        env = System.getenv("GMAIL_USER");
+        if (env != null && !env.trim().isEmpty()) return env.trim();
+
+        // 2. Config properties file
+        String prop = loadPropertyFromConfig("mail.sender");
+        if (prop != null && !prop.trim().isEmpty()) return prop.trim();
+
+        return SENDER_EMAIL;
+    }
+
+    public String resolveSenderPassword() {
+        // 1. Environment variables
+        String env = System.getenv("MAIL_PASSWORD");
+        if (env != null && !env.trim().isEmpty()) return env.trim();
+        env = System.getenv("GMAIL_APP_PASSWORD");
+        if (env != null && !env.trim().isEmpty()) return env.trim();
+
+        // 2. Config properties file
+        String prop = loadPropertyFromConfig("mail.password");
+        if (prop != null && !prop.trim().isEmpty()) return prop.trim();
+
+        return SENDER_APP_PASSWORD;
+    }
+
+    private String loadPropertyFromConfig(String key) {
+        String[] possiblePaths = {
+            "database/medilink_config.properties",
+            "medilink_config.properties",
+            "../database/medilink_config.properties"
+        };
+        for (String path : possiblePaths) {
+            java.io.File file = new java.io.File(path);
+            if (file.exists()) {
+                try (java.io.InputStream in = new java.io.FileInputStream(file)) {
+                    Properties p = new Properties();
+                    p.load(in);
+                    String val = p.getProperty(key);
+                    if (val != null && !val.trim().isEmpty() && !val.startsWith("xxxx") && !val.startsWith("your_gmail")) {
+                        return val.trim();
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
     /**
-     * Sends a 6-digit OTP email to the given recipient.
+     * Sends a 6-digit OTP email to the given recipient via Gmail SMTP.
      *
      * @param toEmail  Recipient email address
      * @param otp      The 6-digit OTP code
      * @throws MessagingException if the email cannot be sent
      */
-    public void sendOtpEmail(String toEmail, String otp) throws MessagingException {
+    public void sendOtpEmail(String toEmail, String otp) throws MessagingException, java.io.UnsupportedEncodingException {
+        final String senderEmail = resolveSenderEmail();
+        final String senderPassword = resolveSenderPassword();
+
         Properties props = new Properties();
         props.put("mail.smtp.auth",            "true");
         props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.starttls.required", "true");
         props.put("mail.smtp.host",            SMTP_HOST);
         props.put("mail.smtp.port",            String.valueOf(SMTP_PORT));
         props.put("mail.smtp.ssl.trust",       SMTP_HOST);
+        props.put("mail.smtp.ssl.protocols",   "TLSv1.2");
+        props.put("mail.smtp.connectiontimeout", "8000");
+        props.put("mail.smtp.timeout",           "8000");
+        props.put("mail.smtp.writetimeout",      "8000");
 
         Session session = Session.getInstance(props, new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(SENDER_EMAIL, SENDER_APP_PASSWORD);
+                return new PasswordAuthentication(senderEmail, senderPassword);
             }
         });
 
         Message message = new MimeMessage(session);
-        message.setFrom(new InternetAddress(SENDER_EMAIL + " (MediLink)"));
+        message.setFrom(new InternetAddress(senderEmail, "MediLink Security"));
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
-        message.setSubject("MediLink — Your Verification Code");
+        message.setSubject("MediLink — Your Verification Code: " + otp);
         message.setContent(buildHtmlBody(otp), "text/html; charset=UTF-8");
 
         Transport.send(message);
-        System.out.println("[EmailService] OTP email sent to: " + toEmail);
+        System.out.println("[EmailService] Real OTP email successfully delivered via Gmail SMTP to: " + toEmail);
     }
 
     /** Checks whether email credentials have been configured. */
     public boolean isConfigured() {
-        return !SENDER_EMAIL.startsWith("your_gmail")
-            && !SENDER_APP_PASSWORD.startsWith("xxxx");
+        String email = resolveSenderEmail();
+        String pass = resolveSenderPassword();
+        return email != null && !email.trim().isEmpty() && !email.startsWith("your_gmail") && !email.contains("example.com")
+            && pass != null && !pass.trim().isEmpty() && !pass.startsWith("xxxx");
     }
 
     // ── HTML email template ────────────────────────────────

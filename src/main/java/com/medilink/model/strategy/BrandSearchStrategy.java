@@ -17,7 +17,9 @@ public class BrandSearchStrategy implements MedicineSearchStrategy {
         }
         String q = query.trim().toLowerCase();
         for (Medicine m : allMedicines) {
-            if (m.getBrandName().toLowerCase().contains(q) || m.getCompany().toLowerCase().contains(q)) {
+            boolean matchBrand = m.getBrandName() != null && m.getBrandName().toLowerCase().contains(q);
+            boolean matchCompany = m.getCompany() != null && m.getCompany().toLowerCase().contains(q);
+            if (matchBrand || matchCompany) {
                 results.add(m);
             }
         }

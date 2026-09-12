@@ -79,8 +79,10 @@ public class Prescription {
     public void initTransientState() {
         if ("EXTRACTED".equalsIgnoreCase(status)) {
             this.state = new ExtractedState();
-        } else if ("VERIFIED".equalsIgnoreCase(status)) {
+        } else if ("VERIFIED".equalsIgnoreCase(status) || "VERIFIED_BY_PHARMACIST".equalsIgnoreCase(status)) {
             this.state = new VerifiedState();
+        } else if ("DISPENSED".equalsIgnoreCase(status)) {
+            this.state = new DispensedState();
         } else {
             this.state = new UploadedState();
         }

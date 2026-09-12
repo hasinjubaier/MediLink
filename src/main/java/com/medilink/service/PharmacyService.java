@@ -99,4 +99,17 @@ public class PharmacyService {
 
         return Optional.of(saved);
     }
+
+    public boolean deletePharmacy(String id) {
+        if (pharmacyRepository.existsById(id)) {
+            // Also clean up any stock references for this pharmacy
+            List<PharmacyStock> stocks = pharmacyStockRepository.findByPharmacyId(id);
+            if (stocks != null && !stocks.isEmpty()) {
+                pharmacyStockRepository.deleteAll(stocks);
+            }
+            pharmacyRepository.deleteById(id);
+            return true;
+        }
+        return false;
+    }
 }

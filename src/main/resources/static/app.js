@@ -1,8 +1,10 @@
+const API_BASE_URL = (window.MEDILINK_CONFIG && window.MEDILINK_CONFIG.API_BASE_URL) ? window.MEDILINK_CONFIG.API_BASE_URL : '';
+
 const state = {
     isAuthenticated: false,
     activeRole: 'PATIENT',
     currentUser: {
-        id: 'usr_patient_01',
+        id: 'ML-9824-A',
         name: 'Rahim Ahmed',
         email: 'rahim@medilink.com',
         role: 'PATIENT'
@@ -13,6 +15,8 @@ const state = {
     pharmacies: [],
     reminders: [],
     notifications: [],
+    pharmacists: [],
+    selectedPharmacistId: 'usr_pharma_01',
     eventSource: null
 };
 
@@ -27,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStocks();
     loadEmergencyPharmacies();
     loadReminders();
+    loadPharmacistsList();
     loadChatMessages();
     renderNotifications();
     initAuthGate();
@@ -114,20 +119,25 @@ function handleNotificationsRemindersClick() {
     openNotificationsIcon();
 }
 
-// Smart "Appointment Management System" Controller:
-// - Directly links/connects to the "Appointments & Doses" feature (tab-reminders)
+// Smart "Medication Reminders & Dose Scheduler" Controller:
+// - Directly links/connects to the "Medication Reminders & Dose Scheduler" feature (tab-reminders)
 // - If unauthenticated -> directly opens Sign Up / Sign In modal
-// - If authenticated -> smoothly navigates to the Appointments & Doses tab and refreshes schedule data
-function handleAppointmentManagementClick() {
+// - If authenticated -> smoothly navigates to the Medication Reminders tab and refreshes schedule data
+function handleMedicationRemindersClick() {
     if (!ensureAuthSessionLoaded()) {
         openAuthModal('signup');
         selectAuthRole('PATIENT', 'signup');
-        showToast('👋 Please create an account or sign in to access Appointments & Doses.');
+        showToast('👋 Please create an account or sign in to access Medication Reminders.');
         return;
     }
 
     launchApp('reminders');
-    showToast('📅 Connected to Appointments & Doses');
+    showToast('⏰ Connected to Medication Reminders & Dose Scheduler');
+}
+
+// Backwards compatibility alias:
+function handleAppointmentManagementClick() {
+    handleMedicationRemindersClick();
 }
 
 // Smart "Medical Records" Controller:
@@ -197,7 +207,7 @@ function launchApp(context) {
     } else if (context === 'pharmacist') {
         switchTab('stock');
     } else if (context === 'admin') {
-        switchTab('medicines');
+        switchTab('admin');
     } else if (context === 'prescriptions') {
         switchTab('prescriptions');
     } else if (context === 'reminders') {
@@ -213,7 +223,7 @@ function launchApp(context) {
         if (activeRole === 'PHARMACIST') {
             switchTab('stock');
         } else if (activeRole === 'ADMIN') {
-            switchTab('medicines');
+            switchTab('admin');
         } else {
             switchTab('dashboard');
         }
@@ -632,8 +642,8 @@ async function handleAuthSubmit(event, formType) {
         const email = document.getElementById('signin-email').value.trim();
         const password = document.getElementById('signin-password').value.trim();
 
-        if (password.length < 8) {
-            showToast('⚠️ Password must contain at least 8 characters.');
+        if (password.length < 6) {
+            showToast('⚠️ Password must contain at least 6 characters.');
             const passInput = document.getElementById('signin-password');
             if (passInput) passInput.focus();
             return;
@@ -689,6 +699,19 @@ async function handleAuthSubmit(event, formType) {
                     showToast(`📝 Switched to Sign Up. Create your account for ${email}!`);
                 }, 1200);
 
+            } else if (data.code === 'INVALID_PASSWORD') {
+                const alertBox = document.getElementById('signin-alert-box');
+                if (alertBox) {
+                    alertBox.innerHTML = `
+                        <span class="alert-icon">⚠️</span>
+                        <div>
+                            <strong>Incorrect password!</strong> 
+                            <a href="javascript:void(0)" onclick="openForgotPasswordModal('${email}')" class="alert-link">Forgot password? Reset it here ➔</a>
+                        </div>
+                    `;
+                    alertBox.style.display = 'flex';
+                }
+                showToast('⚠️ Incorrect password! Click Forgot Password to reset.');
             } else {
                 const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
@@ -710,8 +733,8 @@ async function handleAuthSubmit(event, formType) {
         const role = document.getElementById('signup-role').value;
         const extra = document.getElementById('signup-extra').value.trim();
 
-        if (password.length < 8) {
-            showToast('⚠️ Password must contain at least 8 characters.');
+        if (password.length < 6) {
+            showToast('⚠️ Password must contain at least 6 characters.');
             const passInput = document.getElementById('signup-password');
             if (passInput) passInput.focus();
             return;
@@ -817,6 +840,344 @@ function getUserAvatarAssets(name = '', gender = '', role = 'PATIENT') {
     }
 }
 
+// ========================================================
+// FORGOT PASSWORD & RECOVERY CONTROLLER
+// ========================================================
+let forgotRecoveryState = {
+    step: 1,
+    email: '',
+    otp: '',
+    timerInterval: null,
+    timerSeconds: 300
+};
+
+function openForgotPasswordModal(prefilledEmail = '') {
+    closeModal('modal-auth');
+    
+    if (!prefilledEmail) {
+        const signinInput = document.getElementById('signin-email');
+        if (signinInput && signinInput.value.trim()) {
+            prefilledEmail = signinInput.value.trim();
+        }
+    }
+
+    const emailInput = document.getElementById('modal-reset-email');
+    if (emailInput && prefilledEmail) {
+        emailInput.value = prefilledEmail;
+    }
+
+    setModalRecoveryStep(1);
+    openModal('modal-forgot-password');
+}
+
+function closeForgotPasswordModal() {
+    clearInterval(forgotRecoveryState.timerInterval);
+    closeModal('modal-forgot-password');
+}
+
+function showModalForgotAlert(msg, isSuccess = false) {
+    const alertBox = document.getElementById('modal-forgot-alert');
+    if (!alertBox) return;
+    alertBox.innerHTML = `<span class="alert-icon">${isSuccess ? '✅' : '⚠️'}</span><div>${msg}</div>`;
+    alertBox.style.display = 'flex';
+    if (isSuccess) {
+        alertBox.style.background = 'rgba(16, 185, 129, 0.15)';
+        alertBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        alertBox.style.color = '#6ee7b7';
+    } else {
+        alertBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        alertBox.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        alertBox.style.color = '#fca5a5';
+    }
+}
+
+function hideModalForgotAlert() {
+    const alertBox = document.getElementById('modal-forgot-alert');
+    if (alertBox) alertBox.style.display = 'none';
+}
+
+function setModalRecoveryStep(step) {
+    hideModalForgotAlert();
+    forgotRecoveryState.step = step;
+
+    for (let i = 1; i <= 4; i++) {
+        const p = document.getElementById(`modal-step-panel-${i}`);
+        if (p) p.style.display = (i === step) ? 'block' : 'none';
+    }
+
+    const fill = document.getElementById('modal-step-fill');
+    if (fill) {
+        if (step === 1) fill.style.width = '0%';
+        else if (step === 2) fill.style.width = '50%';
+        else if (step >= 3) fill.style.width = '100%';
+    }
+
+    for (let i = 1; i <= 3; i++) {
+        const dot = document.getElementById(`modal-dot-${i}`);
+        if (!dot) continue;
+        if (i < step) {
+            dot.style.background = '#10b981';
+            dot.style.borderColor = '#34d399';
+            dot.textContent = '✓';
+        } else if (i === step) {
+            dot.style.background = '#2563eb';
+            dot.style.borderColor = '#60a5fa';
+            dot.textContent = i;
+        } else {
+            dot.style.background = '#1e293b';
+            dot.style.borderColor = '#334155';
+            dot.textContent = i;
+        }
+    }
+}
+
+async function requestModalPasswordResetOtp(isResend = false) {
+    hideModalForgotAlert();
+    const emailInput = document.getElementById('modal-reset-email');
+    const email = isResend ? forgotRecoveryState.email : (emailInput ? emailInput.value.trim().toLowerCase() : '');
+
+    if (!email || !email.includes('@')) {
+        showModalForgotAlert('Please provide a valid registered email address.');
+        return;
+    }
+
+    forgotRecoveryState.email = email;
+    const btn = document.getElementById('btn-modal-send-otp');
+    if (btn && !isResend) {
+        btn.disabled = true;
+        btn.textContent = 'Sending Verification Code... ⏳';
+    }
+
+    try {
+        const res = await fetch('/api/auth/send-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, purpose: 'RESET_PASSWORD' })
+        });
+        const data = await res.json();
+
+        if (data.status === 'SUCCESS') {
+            forgotRecoveryState.otp = data.otp || '';
+            const targetDisp = document.getElementById('modal-target-email-disp');
+            if (targetDisp) targetDisp.textContent = email;
+
+            const demoPill = document.getElementById('modal-demo-pill');
+            const demoVal = document.getElementById('modal-demo-otp-val');
+
+            if (data.liveEmailSent) {
+                if (demoPill) demoPill.style.display = 'none';
+                showModalForgotAlert(`📬 Live verification email dispatched to ${email}! Please check your inbox (and spam folder).`, true);
+                showToast(`📧 Live verification email sent to ${email}!`);
+            } else {
+                if (demoPill && demoVal && data.otp) {
+                    demoVal.textContent = data.otp;
+                    demoPill.style.display = 'flex';
+                }
+                showModalForgotAlert(`⚠️ Live SMTP not configured in medilink_config.properties. Demo OTP is provided below for testing.`, true);
+                showToast(`🔑 Demo OTP generated: ${data.otp}`);
+            }
+
+            setModalRecoveryStep(2);
+            startModalOtpCountdown();
+        } else {
+            showModalForgotAlert(data.message || 'Failed to dispatch verification code.');
+        }
+    } catch (e) {
+        showModalForgotAlert('Connection error while reaching authentication server.');
+    } finally {
+        if (btn && !isResend) {
+            btn.disabled = false;
+            btn.textContent = 'Send Verification Code ➔';
+        }
+    }
+}
+
+function startModalOtpCountdown() {
+    clearInterval(forgotRecoveryState.timerInterval);
+    forgotRecoveryState.timerSeconds = 60;
+    const timerEl = document.getElementById('modal-otp-countdown');
+    const resendBtn = document.getElementById('modal-btn-resend');
+
+    if (resendBtn) {
+        resendBtn.style.pointerEvents = 'none';
+        resendBtn.style.opacity = '0.4';
+    }
+
+    forgotRecoveryState.timerInterval = setInterval(() => {
+        forgotRecoveryState.timerSeconds--;
+        const mins = String(Math.floor(forgotRecoveryState.timerSeconds / 60)).padStart(2, '0');
+        const secs = String(forgotRecoveryState.timerSeconds % 60).padStart(2, '0');
+        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+
+        if (forgotRecoveryState.timerSeconds <= 0) {
+            clearInterval(forgotRecoveryState.timerInterval);
+            if (timerEl) timerEl.textContent = 'Expired';
+            if (resendBtn) {
+                resendBtn.style.pointerEvents = 'auto';
+                resendBtn.style.opacity = '1';
+            }
+        }
+    }, 1000);
+}
+
+function autoFillModalOtp() {
+    if (!forgotRecoveryState.otp) return;
+    const input = document.getElementById('modal-otp-code');
+    if (input) input.value = forgotRecoveryState.otp;
+    showModalForgotAlert('OTP code auto-filled from session.', true);
+}
+
+async function verifyModalPasswordResetOtp() {
+    hideModalForgotAlert();
+    const otpInput = document.getElementById('modal-otp-code');
+    const code = otpInput ? otpInput.value.trim() : '';
+
+    if (code.length !== 6) {
+        showModalForgotAlert('Please enter the full 6-digit verification code.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-modal-verify-otp');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/auth/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: forgotRecoveryState.email, otp: code })
+        });
+        const data = await res.json();
+
+        if (data.status === 'SUCCESS') {
+            setModalRecoveryStep(3);
+            showModalForgotAlert('Code verified! Please specify your new password.', true);
+        } else {
+            showModalForgotAlert(data.message || 'Invalid or expired verification code.');
+        }
+    } catch (e) {
+        showModalForgotAlert('Connection error while verifying code.');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function evaluateModalPasswordStrength() {
+    const pass = document.getElementById('modal-new-password')?.value || '';
+    const confirm = document.getElementById('modal-confirm-password')?.value || '';
+
+    const ruleLen = document.getElementById('modal-rule-len');
+    const ruleMatch = document.getElementById('modal-rule-match');
+    const meter = document.getElementById('modal-strength-meter');
+    const badge = document.getElementById('modal-strength-badge');
+
+    let score = 0;
+    if (pass.length >= 6) {
+        score += 50;
+        if (ruleLen) { ruleLen.textContent = '✓ Min 6 chars'; ruleLen.style.color = '#34d399'; }
+    } else {
+        if (ruleLen) { ruleLen.textContent = '○ Min 6 chars'; ruleLen.style.color = '#64748b'; }
+    }
+
+    if (pass && confirm && pass === confirm) {
+        score += 50;
+        if (ruleMatch) { ruleMatch.textContent = '✓ Passwords match'; ruleMatch.style.color = '#34d399'; }
+    } else {
+        if (ruleMatch) { ruleMatch.textContent = '○ Passwords match'; ruleMatch.style.color = '#64748b'; }
+    }
+
+    if (meter && badge) {
+        meter.style.width = Math.max(score, 15) + '%';
+        if (score === 0) {
+            meter.style.background = '#ef4444';
+            badge.textContent = 'Too Short';
+            badge.style.color = '#ef4444';
+        } else if (score === 50) {
+            meter.style.background = '#f59e0b';
+            badge.textContent = 'Moderate';
+            badge.style.color = '#f59e0b';
+        } else {
+            meter.style.background = '#10b981';
+            badge.textContent = 'Strong';
+            badge.style.color = '#10b981';
+        }
+    }
+}
+
+async function submitModalPasswordReset() {
+    hideModalForgotAlert();
+    const newPass = document.getElementById('modal-new-password')?.value || '';
+    const confirmPass = document.getElementById('modal-confirm-password')?.value || '';
+    const otpCode = document.getElementById('modal-otp-code')?.value.trim() || '';
+
+    if (newPass.length < 6) {
+        showModalForgotAlert('Password must contain at least 6 characters.');
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        showModalForgotAlert('Passwords do not match. Please re-enter.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-modal-submit-reset');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving New Password... ⏳';
+    }
+
+    try {
+        const res = await fetch('/api/auth/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: forgotRecoveryState.email,
+                otp: otpCode,
+                newPassword: newPass
+            })
+        });
+        const data = await res.json();
+
+        if (data.status === 'SUCCESS') {
+            setModalRecoveryStep(4);
+            showToast('🎉 Password reset successfully! You can now sign in.');
+        } else {
+            showModalForgotAlert(data.message || 'Password reset failed. Please check your verification code.');
+        }
+    } catch (e) {
+        showModalForgotAlert('Connection error while updating password.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Save New Password ✓';
+        }
+    }
+}
+
+function backToSignInFromForgot(resetSuccess = false) {
+    closeForgotPasswordModal();
+    if (resetSuccess) {
+        const signinEmail = document.getElementById('signin-email');
+        const signinPass = document.getElementById('signin-password');
+        const newPass = document.getElementById('modal-new-password')?.value || '';
+
+        if (signinEmail) signinEmail.value = forgotRecoveryState.email;
+        if (signinPass) signinPass.value = newPass;
+
+        const alertBox = document.getElementById('signin-alert-box');
+        if (alertBox) {
+            alertBox.innerHTML = `
+                <span class="alert-icon">🎉</span>
+                <div style="color: #6ee7b7;">
+                    <strong>Password updated!</strong> Please click Sign In to continue.
+                </div>
+            `;
+            alertBox.style.display = 'flex';
+        }
+    }
+    setAuthMode('signin');
+    openModal('modal-auth');
+}
+
 function applyAuthenticatedUser(user, saveToStorage = true) {
     state.isAuthenticated = true;
     let ecList = [];
@@ -890,20 +1251,37 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
     const stockTabBtn = document.getElementById('tab-btn-stock');
     const verifyTabBtn = document.getElementById('tab-btn-verify');
     const settingsTabBtn = document.getElementById('tab-btn-settings');
+    const adminTabBtn = document.getElementById('tab-btn-admin');
+
+    const chatNavLabel = document.getElementById('tab-btn-chat-label');
+    const remTabBtn = document.getElementById('tab-btn-reminders');
 
     if (user.role === 'PATIENT') {
         if (dashTabBtn) dashTabBtn.style.display = 'flex';
         if (settingsTabBtn) settingsTabBtn.style.display = 'flex';
         if (stockTabBtn) stockTabBtn.style.display = 'none';
+        if (adminTabBtn) adminTabBtn.style.display = 'none';
+        if (remTabBtn) remTabBtn.style.display = 'flex';
+        if (chatNavLabel) chatNavLabel.textContent = 'Pharmacist Live Chat';
     } else if (user.role === 'PHARMACIST') {
         if (dashTabBtn) dashTabBtn.style.display = 'none';
         if (settingsTabBtn) settingsTabBtn.style.display = 'none';
         if (stockTabBtn) stockTabBtn.style.display = 'flex';
+        if (adminTabBtn) adminTabBtn.style.display = 'none';
+        if (remTabBtn) remTabBtn.style.display = 'none';
+        if (chatNavLabel) chatNavLabel.textContent = 'Patient Live Chat';
     } else if (user.role === 'ADMIN') {
         if (dashTabBtn) dashTabBtn.style.display = 'none';
         if (settingsTabBtn) settingsTabBtn.style.display = 'flex';
         if (stockTabBtn) stockTabBtn.style.display = 'flex';
         if (verifyTabBtn) verifyTabBtn.style.display = 'flex';
+        if (adminTabBtn) adminTabBtn.style.display = 'flex';
+        if (remTabBtn) remTabBtn.style.display = 'none';
+        if (chatNavLabel) chatNavLabel.textContent = 'Live Consultations';
+        setTimeout(() => {
+            switchTab('admin');
+            loadAdminData();
+        }, 120);
     }
 
     // 4. Sync Profile Settings Form with Gender-Matched Assets
@@ -1623,13 +2001,20 @@ function switchTab(tabId) {
     }
 
     if (tabId === 'chat') {
+        loadConversationsList();
         loadChatMessages();
+        startChatHeartbeat();
+    } else {
+        stopChatHeartbeat();
     }
     if (tabId === 'reminders') {
         loadReminders();
     }
     if (tabId === 'prescriptions') {
         loadPrescriptions();
+    }
+    if (tabId === 'admin') {
+        loadAdminData();
     }
 }
 
@@ -1640,7 +2025,8 @@ function initRealTimeStream() {
     const tickerBox = document.getElementById('event-ticker-box');
 
     try {
-        state.eventSource = new EventSource('/api/events/stream');
+        const streamUrl = `${API_BASE_URL || ''}/api/events/stream`;
+        state.eventSource = new EventSource(streamUrl);
 
         state.eventSource.onopen = () => {
             if (sseIndicator) sseIndicator.style.background = '#ecfdf5';
@@ -1659,19 +2045,22 @@ function initRealTimeStream() {
                 tickerBox.insertBefore(item, tickerBox.firstChild);
             }
 
-            if (raw.includes('STOCK_UPDATE') || raw.includes('PRESCRIPTION_') || raw.includes('DEMO NOTIFICATION')) {
-                showToast(raw);
-            } else if (raw.includes('MEDICINE ALARM')) {
-                // Only show alarm toast if it belongs to the logged-in patient
-                const userEmail = state.currentUser ? state.currentUser.email : '';
-                if (userEmail && raw.includes(userEmail)) {
+            if (raw.includes('DEMO NOTIFICATION') || raw.includes('MEDICINE ALARM')) {
+                openAlarmModal(raw);
+                addNotification({
+                    icon: '⏰',
+                    title: 'Medicine Dose Alarm',
+                    text: raw.trim(),
+                    time: 'Just now'
+                });
+            } else if (raw.includes('STOCK_UPDATE') || raw.includes('PRESCRIPTION_') || raw.includes('ADMIN_BROADCAST') || raw.includes('SYSTEM ALERT') || raw.includes('SYSTEM_ANNOUNCEMENT') || raw.includes('PRICE_UPDATE')) {
+                if (raw.includes('PRICE_UPDATE')) {
+                    handleLivePriceUpdateEvent(raw);
+                } else {
                     showToast(raw);
-                    addNotification({
-                        icon: '⏰',
-                        title: 'Medicine Dose Alarm',
-                        text: raw.trim(),
-                        time: 'Just now'
-                    });
+                }
+                if (typeof appendAdminAuditLine === 'function') {
+                    appendAdminAuditLine(raw);
                 }
             }
 
@@ -1694,13 +2083,54 @@ function initRealTimeStream() {
                 });
             }
             if (raw.includes('CHAT_MESSAGE')) {
-                loadChatMessages();
-                addNotification({
-                    icon: '💬',
-                    title: 'New Pharmacist Message',
-                    text: 'You received a new message in live consultation.',
-                    time: 'Just now'
-                });
+                const typingIndicator = document.getElementById('chat-typing-indicator');
+                if (typingIndicator) typingIndicator.style.display = 'none';
+
+                let chatMsg = null;
+                try {
+                    const jsonIdx = raw.indexOf('{');
+                    if (jsonIdx !== -1) {
+                        chatMsg = JSON.parse(raw.substring(jsonIdx));
+                    }
+                } catch (e) {
+                    console.warn('Error parsing CHAT_MESSAGE:', e);
+                }
+
+                const currentRole = (state.currentUser?.role || state.activeRole || 'PATIENT').toUpperCase();
+                const currentId = state.currentUser?.id || 'ML-9824-A';
+                const currentEmail = (state.currentUser?.email || '').toLowerCase();
+
+                const isFromMe = chatMsg && (chatMsg.senderId === currentId || (chatMsg.senderEmail && chatMsg.senderEmail.toLowerCase() === currentEmail));
+                const isForMe = chatMsg && (
+                    (chatMsg.receiverId && (chatMsg.receiverId === currentId || (currentRole === 'PHARMACIST' && (chatMsg.receiverId.includes('pharma') || chatMsg.receiverId.startsWith('PH-'))))) ||
+                    (chatMsg.receiverEmail && chatMsg.receiverEmail.toLowerCase() === currentEmail) ||
+                    (currentRole === 'PHARMACIST' && chatMsg.senderRole === 'PATIENT') ||
+                    (currentRole === 'PATIENT' && chatMsg.senderRole === 'PHARMACIST')
+                );
+
+                if (chatMsg && isForMe && !isFromMe) {
+                    const title = currentRole === 'PHARMACIST'
+                        ? `💬 Patient Consultation: ${chatMsg.senderName || 'Patient'}`
+                        : `💬 Pharmacist Advice: ${chatMsg.senderName || 'Dr. Pharmacist'}`;
+                    const text = chatMsg.content || 'You have received a new consultation message.';
+
+                    addNotification({
+                        icon: '💬',
+                        title: title,
+                        text: text,
+                        time: 'Just now'
+                    });
+
+                    showToast(`${title} — "${text.length > 55 ? text.substring(0, 52) + '...' : text}"`);
+                    playChatNotificationSound();
+                }
+
+                // If currently on chat tab, refresh messages immediately
+                const chatTab = document.getElementById('tab-chat');
+                if (chatTab && chatTab.classList.contains('active')) {
+                    loadChatMessages();
+                }
+                loadConversationsList();
             }
         };
 
@@ -1751,23 +2181,23 @@ function renderMedicines(list) {
     }
 
     container.innerHTML = list.map(m => `
-        <div class="med-card">
+        <div class="med-card" id="med-card-${m.id}" data-med-id="${m.id}">
             <div>
                 <div class="med-header">
                     <div>
-                        <div class="med-brand">${m.brandName} <small style="font-size:0.75rem; color:#64748b;">${m.strength}</small></div>
-                        <div class="med-generic">${m.genericName} • ${m.formulation}</div>
+                        <div class="med-brand">${escapeHtml(m.brandName)} <small style="font-size:0.75rem; color:#64748b;">${escapeHtml(m.strength || '')}</small></div>
+                        <div class="med-generic">${escapeHtml(m.genericName)} • ${escapeHtml(m.formulation || '')}</div>
                     </div>
-                    <div class="med-price">BDT ${m.unitPrice.toFixed(2)}</div>
+                    <div class="med-price" id="med-price-${m.id}" data-price="${m.unitPrice}">BDT ${m.unitPrice.toFixed(2)}</div>
                 </div>
-                <div class="med-company">Mfg: ${m.company} (${m.category})</div>
-                <div class="med-badge-box">🛡️ ${m.displayBadge}</div>
-                ${m.sideEffects ? `<small class="text-muted" style="display:block; margin-top:8px;"><strong>Note:</strong> ${m.sideEffects}</small>` : ''}
+                <div class="med-company">Mfg: ${escapeHtml(m.company || '')} (${escapeHtml(m.category || '')})</div>
+                <div class="med-badge-box">🛡️ ${escapeHtml(m.displayBadge || 'Standard')}</div>
+                ${m.sideEffects ? `<small class="text-muted" style="display:block; margin-top:8px;"><strong>Note:</strong> ${escapeHtml(m.sideEffects)}</small>` : ''}
             </div>
             <div class="med-card-actions">
-                <button class="btn btn-secondary" style="flex:1;" onclick="findAlternatives('${m.genericName}')">🔍 Generic Alts</button>
+                <button class="btn btn-secondary" style="flex:1;" onclick="findAlternatives('${escapeHtml(m.genericName)}')">🔍 Generic Alts</button>
                 <button class="btn btn-secondary" style="flex:1; border-color:#0284c7; color:#0284c7; font-weight:600;" onclick="openPriceComparisonModal('${m.id}', '${escapeHtml(m.brandName)}')">🏷️ Compare Prices</button>
-                <button class="btn btn-primary" style="flex:1;" onclick="checkAvailabilityFor('${m.brandName}')">📍 Find Stock</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="checkAvailabilityFor('${escapeHtml(m.brandName)}')">📍 Find Stock</button>
             </div>
         </div>
     `).join('');
@@ -2138,8 +2568,9 @@ function clearVoiceRecording(scope) {
 
     if (audioEl) audioEl.src = '';
     if (previewBox) previewBox.style.display = 'none';
-    if (btnText) btnText.textContent = '🎙️ Record Voice Note';
-    showToast('Voice note removed.');
+    if (previewBox || audioEl) {
+        showToast('Voice note removed.');
+    }
 }
 
 function openPrescriptionUploadModal() {
@@ -2345,42 +2776,132 @@ async function verifyMedicineCode() {
     }
 }
 
-// 6. Reminders & Multithreaded Background Scheduler
-async function loadReminders() {
+// 6. Medication Reminders & Dose Intake Scheduler Workflow
+let activeAlarmLoopTimer = null;
+
+function playCheckSound() {
     try {
-        const res = await fetch('/api/reminders');
-        const data = await res.json();
-        state.reminders = data.reminders || [];
-        renderReminders(state.reminders);
-    } catch (e) {
-        console.error(e);
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08);
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.16);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+    } catch (e) {}
+}
+
+function playAlarmSoundLoop() {
+    stopAlarmSoundLoop();
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        
+        const playBeep = () => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        };
+        
+        playBeep();
+        activeAlarmLoopTimer = setInterval(playBeep, 1200);
+    } catch (e) {}
+}
+
+function stopAlarmSoundLoop() {
+    if (activeAlarmLoopTimer) {
+        clearInterval(activeAlarmLoopTimer);
+        activeAlarmLoopTimer = null;
     }
 }
 
-function renderReminders(list) {
+async function loadReminders() {
+    try {
+        const pId = (state.currentUser && state.currentUser.id) ? state.currentUser.id : 'ML-9824-A';
+        const pEmail = (state.currentUser && state.currentUser.email) ? state.currentUser.email : 'rahim@medilink.com';
+
+        const res = await fetch(`/api/reminders?patientId=${encodeURIComponent(pId)}&email=${encodeURIComponent(pEmail)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        state.reminders = data.reminders || [];
+        state.reminderSummary = data;
+
+        // Update Adherence Progress Bar & Counters
+        const pct = data.adherencePercentage != null ? data.adherencePercentage : 0;
+        const pctText = document.getElementById('adherence-pct-text');
+        const fillBar = document.getElementById('adherence-progress-fill');
+        const totalEl = document.getElementById('adherence-total-count');
+        const takenEl = document.getElementById('adherence-taken-count');
+        const pendEl = document.getElementById('adherence-pending-count');
+
+        if (pctText) pctText.textContent = `${pct}% Completed Today`;
+        if (fillBar) fillBar.style.width = `${pct}%`;
+        if (totalEl) totalEl.textContent = data.totalCount || 0;
+        if (takenEl) takenEl.textContent = data.takenTodayCount || 0;
+        if (pendEl) pendEl.textContent = data.pendingTodayCount || 0;
+
+        renderReminders();
+        populatePrescriptionPicker();
+    } catch (e) {
+        console.error('Failed to load reminders:', e);
+    }
+}
+
+function filterReminders(filterType, btnEl) {
+    state.activeReminderFilter = filterType || 'ALL';
+    if (btnEl) {
+        const bar = document.getElementById('reminders-filter-bar');
+        if (bar) {
+            bar.querySelectorAll('.rem-filter-pill').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+    }
+    renderReminders();
+}
+
+function renderReminders() {
     const container = document.getElementById('reminders-container');
     const dashContainer = document.getElementById('dash-today-reminders');
     const dashRemCount = document.getElementById('dash-rem-count');
 
+    const allList = state.reminders || [];
+
     if (dashRemCount) {
-        dashRemCount.textContent = list ? list.length : 0;
+        dashRemCount.textContent = allList.length;
     }
 
     if (dashContainer) {
-        if (!list || list.length === 0) {
+        if (allList.length === 0) {
             dashContainer.innerHTML = '<p class="text-muted" style="font-size:0.85rem;">No scheduled doses for today.</p>';
         } else {
-            dashContainer.innerHTML = list.map((r, idx) => `
+            dashContainer.innerHTML = allList.slice(0, 5).map(r => `
                 <div class="dash-rem-item">
                     <div class="dash-rem-left">
                         <span class="rem-icon-pill">💊</span>
                         <div>
-                            <strong>${r.medicine} (${r.dosage})</strong>
-                            <small>🕒 ${r.time} • ${r.frequency} • ${r.instructions}</small>
+                            <strong>${escapeHtml(r.medicine)} (${escapeHtml(r.dosage)})</strong>
+                            <small>🕒 ${escapeHtml(r.time)} • ${escapeHtml(r.mealTiming || 'After Meal')} • ${escapeHtml(r.instructions || '')}</small>
                         </div>
                     </div>
-                    <span class="rem-status-pill ${idx === 0 ? 'rem-taken' : 'rem-pending'}">
-                        ${idx === 0 ? '✓ Taken' : 'Upcoming'}
+                    <span class="rem-status-pill ${r.isTakenToday ? 'rem-taken' : 'rem-pending'}" onclick="handleTakeDose('${r.id}')" style="cursor:pointer;" title="Click to log dose">
+                        ${r.isTakenToday ? '✓ Taken' : 'Due Today'}
                     </span>
                 </div>
             `).join('');
@@ -2389,30 +2910,242 @@ function renderReminders(list) {
 
     if (!container) return;
 
-    if (!list || list.length === 0) {
-        container.innerHTML = '<p class="text-muted">No scheduled medicine reminders.</p>';
+    if (allList.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 48px 16px; background: var(--card-bg, #ffffff); border: 1px dashed var(--border-color, #cbd5e1); border-radius: 12px;">
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">💊</div>
+                <h3 style="margin-bottom: 6px;">No Medication Reminders Scheduled</h3>
+                <p class="text-muted" style="font-size: 0.9rem; max-width: 420px; margin: 0 auto 16px auto;">
+                    Keep your treatment on track. You can add a custom reminder or automatically generate dose schedules from your medical prescriptions.
+                </p>
+                <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+                    <button class="btn btn-sync-rx" onclick="handleSyncFromPrescriptions()">⚡ Sync from Prescriptions</button>
+                    <button class="btn btn-primary" onclick="openReminderModal()">+ Add Reminder</button>
+                </div>
+            </div>
+        `;
         return;
     }
 
-    container.innerHTML = list.map(r => {
-        const isAppt = r.medicine && (r.medicine.toLowerCase().includes('appointment') || r.dosage.toLowerCase().includes('consult'));
-        const icon = isAppt ? '📅' : '⏰';
-        return `
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <h3 style="font-size:1.15rem; font-weight:800;">${icon} ${r.medicine} (${r.dosage})</h3>
-                <p class="text-muted">Time: <strong>${r.time}</strong> • Frequency: ${r.frequency}</p>
-                <small class="text-muted">${r.instructions}</small>
+    // Apply active filter
+    const filter = state.activeReminderFilter || 'ALL';
+    const filtered = allList.filter(r => {
+        if (!r.time) return true;
+        const timeVal = r.time.trim();
+        if (filter === 'ALL') return true;
+        if (filter === 'TAKEN') return r.isTakenToday;
+        if (filter === 'PENDING') return !r.isTakenToday && r.active;
+        if (filter === 'MORNING') return timeVal >= '05:00' && timeVal < '12:00';
+        if (filter === 'AFTERNOON') return timeVal >= '12:00' && timeVal < '17:00';
+        if (filter === 'EVENING') return timeVal >= '17:00' && timeVal < '21:00';
+        if (filter === 'NIGHT') return timeVal >= '21:00' || timeVal < '05:00';
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 32px 16px; color: var(--text-muted, #64748b);">
+                <p>No doses match the selected filter (<strong>${escapeHtml(filter)}</strong>).</p>
+                <button class="btn btn-sm btn-secondary" onclick="filterReminders('ALL')">View All Doses</button>
             </div>
-            <span class="status-pill ${r.active ? 'status-verified' : 'status-extracted'}">
-                ${r.active ? (isAppt ? 'Confirmed Schedule' : 'Active Scheduler') : 'Paused'}
-            </span>
-        </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.map(r => {
+        const isTaken = r.isTakenToday;
+        const isPaused = !r.active;
+
+        // Convert "08:00" to "08:00 AM"
+        let formattedTime = r.time;
+        let period = 'AM';
+        if (r.time && r.time.includes(':')) {
+            const parts = r.time.split(':');
+            let h = parseInt(parts[0], 10);
+            const m = parts[1];
+            period = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            formattedTime = `${h.toString().padStart(2, '0')}:${m}`;
+        }
+
+        let mealLabel = '🍽️ After Meal';
+        if (r.mealTiming === 'BEFORE_MEAL') mealLabel = '🥣 30m Before Meal';
+        else if (r.mealTiming === 'WITH_MEAL') mealLabel = '🥗 With Food';
+        else if (r.mealTiming === 'EMPTY_STOMACH') mealLabel = '💧 Empty Stomach';
+        else if (r.mealTiming === 'BEDTIME') mealLabel = '🌙 At Bedtime';
+
+        let cardStatusClass = '';
+        if (isTaken) cardStatusClass = 'is-taken';
+        else if (isPaused) cardStatusClass = 'is-paused';
+        else cardStatusClass = 'is-due';
+
+        return `
+            <div class="reminder-card-modern ${cardStatusClass}" id="rem-card-${r.id}">
+                <div class="rem-card-left">
+                    <div class="rem-time-badge">
+                        <span>${formattedTime}</span>
+                        <span class="rem-time-period">${period}</span>
+                    </div>
+                    <div class="rem-card-details">
+                        <div class="rem-card-title-row">
+                            <strong>${escapeHtml(r.medicine)}</strong>
+                            <span class="rem-dosage-tag">${escapeHtml(r.dosage)}</span>
+                            <span class="rem-meal-tag">${escapeHtml(mealLabel)}</span>
+                            ${isTaken ? `<span class="rem-taken-timestamp">✓ Taken Today</span>` : ''}
+                            ${isPaused ? `<span class="badge badge-secondary" style="font-size:0.7rem;">PAUSED</span>` : ''}
+                        </div>
+                        <div class="rem-instructions-text">
+                            ${escapeHtml(r.instructions || 'Take with water as directed.')}
+                        </div>
+                        <small class="text-muted" style="font-size:0.75rem;">
+                            Frequency: <strong>${escapeHtml(r.frequency || 'Daily')}</strong>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="rem-card-actions">
+                    ${!isTaken ? `
+                        <button type="button" class="btn-take-dose" onclick="handleTakeDose('${r.id}')" title="Log this dose as taken today">
+                            ✓ Take Dose
+                        </button>
+                    ` : `
+                        <button type="button" class="btn-dose-taken" onclick="handleTakeDose('${r.id}')" title="Dose logged. Click to unmark.">
+                            ✓ Taken
+                        </button>
+                    `}
+
+                    <button type="button" class="btn-snooze-dose" onclick="handleSnooze('${r.id}', 15)" title="Snooze reminder for 15 minutes">
+                        ⏰ +15m
+                    </button>
+
+                    <label class="rem-toggle-switch" title="${r.active ? 'Active schedule - click to pause' : 'Paused - click to resume'}">
+                        <input type="checkbox" ${r.active ? 'checked' : ''} onchange="handleToggleReminder('${r.id}')">
+                        <span class="rem-toggle-slider"></span>
+                    </label>
+
+                    <button type="button" class="btn-rem-delete" onclick="handleDeleteReminder('${r.id}')" title="Delete this reminder">
+                        🗑️
+                    </button>
+                </div>
+            </div>
         `;
     }).join('');
 }
 
+async function handleTakeDose(reminderId) {
+    try {
+        const res = await fetch(`/api/reminders/${encodeURIComponent(reminderId)}/take`, { method: 'POST' });
+        if (!res.ok) throw new Error();
+        playCheckSound();
+        showToast('✅ Dose status logged successfully!');
+        await loadReminders();
+    } catch (e) {
+        showToast('Could not update dose status.');
+    }
+}
+
+async function handleToggleReminder(reminderId) {
+    try {
+        const res = await fetch(`/api/reminders/${encodeURIComponent(reminderId)}/toggle`, { method: 'POST' });
+        if (!res.ok) throw new Error();
+        showToast('Schedule status updated.');
+        await loadReminders();
+    } catch (e) {
+        showToast('Failed to toggle reminder schedule.');
+    }
+}
+
+async function handleDeleteReminder(reminderId) {
+    if (!confirm('Are you sure you want to remove this medication reminder?')) return;
+    try {
+        const res = await fetch(`/api/reminders/${encodeURIComponent(reminderId)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error();
+        showToast('🗑️ Reminder schedule removed.');
+        await loadReminders();
+    } catch (e) {
+        showToast('Failed to delete reminder.');
+    }
+}
+
+function handleSnooze(reminderId, minutes = 15) {
+    const rem = (state.reminders || []).find(r => r.id === reminderId);
+    const name = rem ? rem.medicine : 'Medication';
+    showToast(`⏰ Snoozed ${name} for ${minutes} minutes.`);
+    setTimeout(() => {
+        openAlarmModal(`REMINDER_ALARM: Time to take your snoozed dose of ${name}!`);
+    }, minutes * 60 * 1000);
+}
+
+async function handleSyncFromPrescriptions() {
+    try {
+        const pId = (state.currentUser && state.currentUser.id) ? state.currentUser.id : 'ML-9824-A';
+        const pEmail = (state.currentUser && state.currentUser.email) ? state.currentUser.email : 'rahim@medilink.com';
+
+        const res = await fetch('/api/reminders/sync-prescriptions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patientId: pId, email: pEmail })
+        });
+        const data = await res.json();
+        showToast(data.message || 'Prescription dose sync completed!');
+        playCheckSound();
+        await loadReminders();
+    } catch (e) {
+        showToast('Failed to sync reminders from prescriptions.');
+    }
+}
+
+function populatePrescriptionPicker() {
+    const picker = document.getElementById('rem-prescription-picker');
+    if (!picker) return;
+
+    // Collect medicines from state.medicines and state.prescriptions
+    const meds = [];
+    if (state.medicines && Array.isArray(state.medicines)) {
+        state.medicines.forEach(m => {
+            if (m.name && !meds.some(x => x.name === m.name)) {
+                meds.push({ name: m.name, dosage: m.dosage || '1 Tablet', timing: 'AFTER_MEAL', instr: m.category || 'Prescribed Medication' });
+            }
+        });
+    }
+
+    if (meds.length === 0) {
+        meds.push(
+            { name: 'Napa Extra 500mg', dosage: '1 Tablet', timing: 'AFTER_MEAL', instr: 'Take after meal with water' },
+            { name: 'Seclo 20mg', dosage: '1 Capsule', timing: 'BEFORE_MEAL', instr: 'Take 30 mins before breakfast' },
+            { name: 'Monas 10mg', dosage: '1 Tablet', timing: 'BEDTIME', instr: 'Take at bedtime for asthma/allergies' },
+            { name: 'Fexo 120mg', dosage: '1 Tablet', timing: 'BEDTIME', instr: 'Take at bedtime for allergy relief' },
+            { name: 'Lisinopril 10mg', dosage: '1 Tablet', timing: 'AFTER_MEAL', instr: 'Take morning blood pressure dose' }
+        );
+    }
+
+    picker.innerHTML = `
+        <option value="">-- Quick select from active prescriptions --</option>
+        ${meds.map((m, i) => `
+            <option value="${i}" data-name="${escapeHtml(m.name)}" data-dosage="${escapeHtml(m.dosage)}" data-timing="${escapeHtml(m.timing)}" data-instr="${escapeHtml(m.instr)}">
+                ${escapeHtml(m.name)} (${escapeHtml(m.dosage)})
+            </option>
+        `).join('')}
+    `;
+}
+
+function handlePrescriptionPickerChange(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt || !opt.value) return;
+
+    const name = opt.getAttribute('data-name');
+    const dosage = opt.getAttribute('data-dosage');
+    const timing = opt.getAttribute('data-timing');
+    const instr = opt.getAttribute('data-instr');
+
+    if (name) document.getElementById('rem-med-name').value = name;
+    if (dosage) document.getElementById('rem-dosage').value = dosage;
+    if (timing) document.getElementById('rem-meal-timing').value = timing;
+    if (instr) document.getElementById('rem-instructions').value = instr;
+}
+
 function openReminderModal() {
+    populatePrescriptionPicker();
     document.getElementById('modal-reminder').classList.add('active');
 }
 
@@ -2421,45 +3154,461 @@ async function submitNewReminder() {
     const dosage = document.getElementById('rem-dosage').value;
     const time = document.getElementById('rem-time').value;
     const freq = document.getElementById('rem-freq').value;
+    const mealTimingEl = document.getElementById('rem-meal-timing');
+    const mealTiming = mealTimingEl ? mealTimingEl.value : 'AFTER_MEAL';
     const instructions = document.getElementById('rem-instructions').value;
 
+    if (!med || !time) {
+        showToast('Please enter both medicine name and scheduled time.');
+        return;
+    }
+
     try {
-        await fetch('/api/reminders/create', {
+        const pId = (state.currentUser && state.currentUser.id) ? state.currentUser.id : 'ML-9824-A';
+        const pEmail = (state.currentUser && state.currentUser.email) ? state.currentUser.email : 'rahim@medilink.com';
+
+        const res = await fetch('/api/reminders/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                email: state.currentUser.email,
+                patientId: pId,
+                email: pEmail,
                 medicine: med,
                 dosage: dosage,
                 time: time,
                 frequency: freq,
+                mealTiming: mealTiming,
                 instructions: instructions
             })
         });
+
+        if (!res.ok) throw new Error();
         closeModal('modal-reminder');
-        showToast(`Scheduled reminder for ${med} at ${time}`);
-        loadReminders();
+        playCheckSound();
+        showToast(`✅ Scheduled reminder for ${med} at ${time}`);
+        await loadReminders();
     } catch (e) {
-        showToast('Failed to create reminder.');
+        showToast('Failed to save reminder schedule.');
     }
 }
 
 async function triggerTestAlarm() {
     try {
-        await fetch('/api/reminders/test-alert', { method: 'POST' });
+        // Open modal immediately on client with audible alarm
+        openAlarmModal('DEMO NOTIFICATION: Time to take your scheduled dose of Napa Extra 500mg (1 Tablet) - Take after lunch with water!');
+        // Broadcast over backend SSE stream as well
+        fetch('/api/reminders/test-alert', { method: 'POST' }).catch(() => {});
     } catch (e) {
-        showToast('Error triggering alarm.');
+        showToast('Error triggering instant alarm.');
     }
 }
 
-// 7. Live Pharmacist Chat
-async function loadChatMessages() {
+function openAlarmModal(alarmContent) {
+    const modal = document.getElementById('modal-alarm-ringing');
+    if (!modal) return;
+
+    let medName = 'Napa Extra 500mg';
+    let dosage = '1 Tablet';
+    let instr = '🍽️ Take after lunch with a full glass of water.';
+
+    if (alarmContent && typeof alarmContent === 'string') {
+        if (alarmContent.includes('take')) {
+            const afterTake = alarmContent.substring(alarmContent.indexOf('take') + 4).trim();
+            medName = afterTake.split('-')[0].trim();
+            if (afterTake.includes('-')) {
+                instr = afterTake.split('-')[1].trim();
+            }
+        }
+    }
+
+    const nameEl = document.getElementById('alarm-modal-med-name');
+    const doseEl = document.getElementById('alarm-modal-dosage');
+    const instrEl = document.getElementById('alarm-modal-instructions');
+
+    if (nameEl) nameEl.textContent = medName;
+    if (doseEl) doseEl.textContent = dosage;
+    if (instrEl) instrEl.textContent = instr;
+
+    playAlarmSoundLoop();
+    modal.classList.add('active');
+}
+
+function closeAlarmModal() {
+    stopAlarmSoundLoop();
+    const modal = document.getElementById('modal-alarm-ringing');
+    if (modal) modal.classList.remove('active');
+}
+
+function handleAlarmModalTakeDose() {
+    closeAlarmModal();
+    playCheckSound();
+    showToast('🎉 Excellent! Dose marked as taken for today.');
+
+    // If there's an active pending reminder, mark the first one as taken
+    const pending = (state.reminders || []).find(r => !r.isTakenToday && r.active);
+    if (pending) {
+        handleTakeDose(pending.id);
+    } else {
+        loadReminders();
+    }
+}
+
+function handleAlarmModalSnooze(minutes = 10) {
+    closeAlarmModal();
+    showToast(`⏰ Alarm snoozed for ${minutes} minutes.`);
+    setTimeout(() => {
+        openAlarmModal('SNOOZED ALARM: Time to take your scheduled medication!');
+    }, minutes * 60 * 1000);
+}
+
+// 7. Live Patient - Pharmacist Chat & Clinical Tele-Consultation (Two-Way Connected)
+
+let chatHeartbeatTimer = null;
+
+function startChatHeartbeat() {
+    stopChatHeartbeat();
+    chatHeartbeatTimer = setInterval(() => {
+        const chatTab = document.getElementById('tab-chat');
+        if (chatTab && chatTab.classList.contains('active')) {
+            loadChatMessages(true);
+            loadConversationsList(true);
+        }
+    }, 3500);
+}
+
+function stopChatHeartbeat() {
+    if (chatHeartbeatTimer) {
+        clearInterval(chatHeartbeatTimer);
+        chatHeartbeatTimer = null;
+    }
+}
+
+function playChatNotificationSound() {
     try {
-        const res = await fetch('/api/chat/messages');
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.36);
+    } catch (e) {}
+}
+
+function updateChatNavBadge(totalUnread) {
+    const badge = document.getElementById('chat-unread-badge');
+    if (!badge) return;
+    if (totalUnread && totalUnread > 0) {
+        badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+async function loadConversationsList(isSilent = false) {
+    try {
+        const currentUser = state.currentUser || {};
+        const currentId = currentUser.id || 'ML-9824-A';
+        const role = (currentUser.role || state.activeRole || 'PATIENT').toUpperCase();
+
+        const res = await fetch(`${API_BASE_URL}/api/chat/conversations?userId=${encodeURIComponent(currentId)}&role=${encodeURIComponent(role)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const convs = data.conversations || [];
+        state.conversations = convs;
+
+        const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+        updateChatNavBadge(totalUnread);
+
+        renderConversationsSidebar();
+
+        if (!state.activeChatPartner && convs.length > 0) {
+            const first = convs[0];
+            selectConversation(first.partnerId, first.partnerName, first.partnerRole, first.partnerEmail, first.avatar, first.pharmacy, first.license);
+        } else if (state.activeChatPartner) {
+            const updated = convs.find(c => c.partnerId === state.activeChatPartner.id);
+            if (updated) {
+                state.activeChatPartner.name = updated.partnerName || state.activeChatPartner.name;
+                state.activeChatPartner.email = updated.partnerEmail || state.activeChatPartner.email;
+            }
+        }
+    } catch (e) {
+        if (!isSilent) console.warn('Failed to load chat conversations:', e);
+    }
+}
+
+async function loadPharmacistsList() {
+    await loadConversationsList();
+}
+
+function renderConversationsSidebar() {
+    const listEl = document.getElementById('chat-threads-list');
+    if (!listEl) return;
+
+    const currentUser = state.currentUser || {};
+    const currentRole = (currentUser.role || state.activeRole || 'PATIENT').toUpperCase();
+
+    const sidebarTitle = document.getElementById('chat-sidebar-title');
+    if (sidebarTitle) {
+        sidebarTitle.textContent = currentRole === 'PHARMACIST' ? 'Patient Consultations' : 'Consultations';
+    }
+
+    const conversations = state.conversations || [];
+    if (conversations.length === 0) {
+        listEl.innerHTML = `
+            <div style="padding: 24px 16px; text-align: center; color: var(--text-muted, #94a3b8); font-size: 0.85rem;">
+                <div style="font-size: 1.6rem; margin-bottom: 8px;">💬</div>
+                No active conversations yet.<br>
+                <small>${currentRole === 'PHARMACIST' ? 'Incoming patient consultations will appear here.' : 'Verified pharmacists will appear here.'}</small>
+            </div>
+        `;
+        return;
+    }
+
+    const currentPartnerId = state.activeChatPartner ? state.activeChatPartner.id : (conversations[0] ? conversations[0].partnerId : '');
+
+    listEl.innerHTML = conversations.map(c => {
+        const isActive = c.partnerId === currentPartnerId;
+        const snippet = c.lastMessage || (c.partnerRole === 'PHARMACIST' ? 'Ready for clinical consultation' : 'Patient consultation');
+        const roleBadge = c.partnerRole === 'PHARMACIST' ? 'DGDA' : 'PATIENT';
+        const avatar = c.avatar || (c.partnerRole === 'PHARMACIST' ? '🩺' : '👤');
+
+        let storeOrId = '';
+        if (c.partnerRole === 'PHARMACIST') {
+            storeOrId = c.pharmacy ? c.pharmacy.split('(')[0].trim() : 'Licensed Pharmacy';
+        } else {
+            storeOrId = `Patient ID: ${c.partnerId}`;
+        }
+
+        const unreadBadgeHtml = (c.unreadCount && c.unreadCount > 0)
+            ? `<span class="chat-thread-unread-badge" title="${c.unreadCount} unread">${c.unreadCount}</span>`
+            : '';
+
+        let timeStr = '';
+        if (c.lastMessageTime) {
+            try {
+                const d = new Date(c.lastMessageTime);
+                if (!isNaN(d.getTime())) {
+                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+            } catch (e) {}
+        }
+
+        return `
+            <div class="chat-thread-card ${isActive ? 'active' : ''}" onclick="selectConversation('${escapeHtml(c.partnerId)}', '${escapeHtml(c.partnerName)}', '${escapeHtml(c.partnerRole)}', '${escapeHtml(c.partnerEmail || '')}', '${escapeHtml(avatar)}', '${escapeHtml(c.pharmacy || '')}', '${escapeHtml(c.license || '')}')">
+                <div class="chat-thread-avatar-wrap">
+                    <div class="chat-thread-avatar">${avatar}</div>
+                    <span class="chat-thread-online-dot"></span>
+                </div>
+                <div class="chat-thread-info">
+                    <div class="chat-thread-title">
+                        <strong>${escapeHtml(c.partnerName)}</strong>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            ${unreadBadgeHtml}
+                            <span class="chat-thread-badge">${escapeHtml(roleBadge)}</span>
+                        </div>
+                    </div>
+                    <div class="chat-thread-store" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span>${escapeHtml(storeOrId)}</span>
+                        ${timeStr ? `<small style="font-size:0.68rem; color:#64748b;">${timeStr}</small>` : ''}
+                    </div>
+                    <div class="chat-thread-snippet">${escapeHtml(snippet)}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderPharmacistsSidebar() {
+    renderConversationsSidebar();
+}
+
+function selectConversation(partnerId, partnerName, partnerRole, partnerEmail, partnerAvatar, partnerStore, partnerLicense) {
+    state.activeChatPartner = {
+        id: partnerId,
+        name: partnerName || (partnerRole === 'PHARMACIST' ? 'Dr. Pharmacist' : 'Patient'),
+        role: partnerRole || 'PATIENT',
+        email: partnerEmail || '',
+        avatar: partnerAvatar || (partnerRole === 'PHARMACIST' ? '🩺' : '👤'),
+        pharmacy: partnerStore || '',
+        license: partnerLicense || ''
+    };
+
+    if (partnerRole === 'PHARMACIST') {
+        state.selectedPharmacistId = partnerId;
+    } else {
+        state.selectedPatientId = partnerId;
+    }
+
+    updateActiveChatHeader();
+    renderConversationsSidebar();
+    renderChatQuickChips();
+
+    const currentUser = state.currentUser || {};
+    const currentId = currentUser.id || 'ML-9824-A';
+    fetch(`${API_BASE_URL}/api/chat/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user1: currentId, user2: partnerId })
+    }).then(() => {
+        if (state.conversations) {
+            const found = state.conversations.find(c => c.partnerId === partnerId);
+            if (found) found.unreadCount = 0;
+            const totalUnread = state.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+            updateChatNavBadge(totalUnread);
+        }
+    }).catch(() => {});
+
+    const input = document.getElementById('chat-input');
+    if (input) input.value = '';
+
+    const box = document.getElementById('chat-messages-box');
+    if (box) box.style.opacity = '0.5';
+
+    loadChatMessages().finally(() => {
+        if (box) box.style.opacity = '1';
+    });
+}
+
+function selectPharmacistConversation(pharmaId) {
+    const pharma = (state.pharmacists || state.conversations || []).find(p => p.id === pharmaId || p.partnerId === pharmaId);
+    if (pharma) {
+        selectConversation(
+            pharma.id || pharma.partnerId,
+            pharma.name || pharma.partnerName,
+            'PHARMACIST',
+            pharma.email || pharma.partnerEmail,
+            pharma.avatar,
+            pharma.pharmacy,
+            pharma.license
+        );
+    } else {
+        selectConversation(pharmaId, pharmaId === 'usr_pharma_02' ? 'Dr. Nazmul Huda' : 'Dr. Farhan Kabir', 'PHARMACIST', '', '🩺', '', '');
+    }
+}
+
+function updateActiveChatHeader() {
+    const partner = state.activeChatPartner || {
+        id: 'usr_pharma_01',
+        name: 'Dr. Farhan Kabir',
+        role: 'PHARMACIST',
+        avatar: '🩺',
+        pharmacy: 'Lazz Pharma (Dhanmondi Branch)',
+        license: 'DGDA-PH-9920'
+    };
+
+    const avatarEl = document.getElementById('chat-active-avatar');
+    const nameEl = document.getElementById('chat-active-pharma-name');
+    const storeEl = document.getElementById('chat-active-pharma-store');
+    const roleBadgeEl = document.getElementById('chat-active-role-badge');
+    const onlineEl = document.getElementById('chat-online-label');
+    const typingTextEl = document.getElementById('chat-typing-text');
+    const inputEl = document.getElementById('chat-input');
+
+    if (avatarEl) avatarEl.textContent = partner.avatar || (partner.role === 'PHARMACIST' ? '🩺' : '👤');
+    if (nameEl) nameEl.textContent = partner.name;
+
+    if (roleBadgeEl) {
+        roleBadgeEl.textContent = partner.role === 'PHARMACIST' ? 'DGDA VERIFIED' : 'VERIFIED PATIENT';
+        roleBadgeEl.className = partner.role === 'PHARMACIST' ? 'badge badge-success' : 'badge badge-primary';
+    }
+
+    if (storeEl) {
+        if (partner.role === 'PHARMACIST') {
+            storeEl.textContent = `Licensed Pharmacist | ${partner.pharmacy || 'Partner Pharmacy'}`;
+        } else {
+            storeEl.textContent = `Patient ID: ${partner.id}${partner.email ? ' • ' + partner.email : ''}`;
+        }
+    }
+
+    if (onlineEl) onlineEl.textContent = 'Online';
+    if (typingTextEl) typingTextEl.textContent = `${partner.name} is typing...`;
+
+    if (inputEl) {
+        const myRole = (state.currentUser?.role || state.activeRole || 'PATIENT').toUpperCase();
+        if (myRole === 'PHARMACIST') {
+            inputEl.placeholder = `Type clinical advice response to ${partner.name}... (Press Enter to send)`;
+        } else {
+            inputEl.placeholder = `Type your medication query to ${partner.name}... (Press Enter to send)`;
+        }
+    }
+}
+
+function updateActivePharmacistHeader(pharmaId) {
+    selectPharmacistConversation(pharmaId);
+}
+
+function handlePharmacistSelectionChange() {
+    const selectedPharma = state.selectedPharmacistId || 'usr_pharma_01';
+    selectPharmacistConversation(selectedPharma);
+}
+
+function renderChatQuickChips() {
+    const container = document.getElementById('chat-quick-chips-bar');
+    if (!container) return;
+
+    const myRole = (state.currentUser?.role || state.activeRole || 'PATIENT').toUpperCase();
+
+    if (myRole === 'PHARMACIST') {
+        container.innerHTML = `
+            <span class="chat-quick-chips-label">⚡ Clinical Responses:</span>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Take this medication 30 minutes before meals with a full glass of water.')">
+                💊 Before Meals (1+0+1)
+            </button>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Ensure at least a 4-hour gap between doses. Do not exceed the prescribed limit.')">
+                ⏱️ 4-Hour Dose Gap
+            </button>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Your prescription is verified and authentic stock is available at our pharmacy.')">
+                📋 Verified & In Stock
+            </button>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('If any dizziness, nausea, or allergic rash persists, discontinue and seek immediate clinical care.')">
+                ⚠️ Clinical Precaution
+            </button>
+        `;
+    } else {
+        container.innerHTML = `
+            <span class="chat-quick-chips-label">⚡ Quick Inquiries:</span>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Check drug interactions for my active medications.', true)">
+                💊 Check Interactions
+            </button>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('What is the optimal dosing time and meal schedule for my medicines?', true)">
+                ⏱️ Dosing &amp; Schedule
+            </button>
+            <button type="button" class="chat-chip" onclick="sendQuickChatMessage('Are there any known adverse side effects or food precautions for these drugs?', true)">
+                ⚠️ Adverse Side Effects
+            </button>
+            <button type="button" class="chat-chip" onclick="openChatAttachRxModal()">
+                📎 Share Prescription
+            </button>
+        `;
+    }
+}
+
+async function loadChatMessages(isSilent = false) {
+    try {
+        const currentUser = state.currentUser || {};
+        const currentId = currentUser.id || 'ML-9824-A';
+        const myRole = (currentUser.role || state.activeRole || 'PATIENT').toUpperCase();
+
+        let partnerId = state.activeChatPartner ? state.activeChatPartner.id : '';
+        if (!partnerId) {
+            partnerId = (myRole === 'PHARMACIST') ? 'ML-9824-A' : (state.selectedPharmacistId || 'usr_pharma_01');
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/chat/messages?user1=${encodeURIComponent(currentId)}&user2=${encodeURIComponent(partnerId)}`);
+        if (!res.ok) return;
         const data = await res.json();
         renderChatMessages(data.messages || []);
     } catch (e) {
-        console.error(e);
+        if (!isSilent) console.error('Error loading chat messages:', e);
     }
 }
 
@@ -2467,42 +3616,277 @@ function renderChatMessages(list) {
     const box = document.getElementById('chat-messages-box');
     if (!box) return;
 
+    const currentUser = state.currentUser || {};
+    const currentRole = (currentUser.role || state.activeRole || 'PATIENT').toUpperCase();
+    const currentId = currentUser.id || 'ML-9824-A';
+    const currentEmail = (currentUser.email || '').toLowerCase();
+
+    const partner = state.activeChatPartner || {
+        id: (currentRole === 'PHARMACIST') ? 'ML-9824-A' : 'usr_pharma_01',
+        name: (currentRole === 'PHARMACIST') ? 'Rahim Ahmed' : 'Dr. Farhan Kabir',
+        role: (currentRole === 'PHARMACIST') ? 'PATIENT' : 'PHARMACIST',
+        avatar: (currentRole === 'PHARMACIST') ? '👤' : '🩺',
+        pharmacy: 'Lazz Pharma (Dhanmondi Branch)',
+        license: 'DGDA-PH-9920'
+    };
+
+    if (!list || list.length === 0) {
+        const emptyTitle = partner.name;
+        const emptySub = partner.role === 'PHARMACIST'
+            ? `${partner.pharmacy || 'Licensed Pharmacy'}. Send a medication query, check drug interactions, or attach your prescription to begin consultation.`
+            : `Patient ID: ${partner.id}. Send verified clinical instructions, review doses, or advise on medicine availability.`;
+
+        const buttonsHtml = currentRole === 'PATIENT' ? `
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="sendQuickChatMessage('Assalamu Alaikum doctor, could you please review my medicine schedule?')">
+                    👋 Say Hello
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="openChatAttachRxModal()">
+                    📎 Attach Prescription
+                </button>
+            </div>
+        ` : `
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="sendQuickChatMessage('Assalamu Alaikum. How may I assist you with your medications today?')">
+                    👋 Start Consultation
+                </button>
+            </div>
+        `;
+
+        box.innerHTML = `
+            <div class="chat-empty-thread-card">
+                <div class="chat-empty-avatar">${partner.avatar || (partner.role === 'PHARMACIST' ? '🩺' : '👤')}</div>
+                <h4 style="margin:0 0 6px 0; color:var(--text-primary, #f8fafc); font-size:1.15rem;">${escapeHtml(emptyTitle)}</h4>
+                <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:8px;">
+                    <span class="${partner.role === 'PHARMACIST' ? 'badge badge-success' : 'badge badge-primary'}" style="font-size:0.7rem; padding:2px 6px;">
+                        ${partner.role === 'PHARMACIST' ? 'DGDA VERIFIED' : 'PATIENT'}
+                    </span>
+                    <span style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(partner.license || partner.id)}</span>
+                </div>
+                <p style="font-size:0.82rem; color:var(--text-muted); max-width:380px; margin:0 auto 16px auto; line-height:1.5;">
+                    ${escapeHtml(emptySub)}
+                </p>
+                ${buttonsHtml}
+            </div>
+        `;
+        return;
+    }
+
     box.innerHTML = list.map(m => {
-        const isMine = m.senderName.includes(state.currentUser.name) || m.senderRole === state.currentUser.role;
+        let isMine = false;
+        if (m.senderId && (m.senderId === currentId || (currentId.startsWith('PA-') && m.senderId === 'ML-9824-A') || (currentId === 'ML-9824-A' && m.senderId.startsWith('PA-')))) {
+            isMine = true;
+        } else if (currentEmail && m.senderEmail && m.senderEmail.toLowerCase() === currentEmail) {
+            isMine = true;
+        } else if (currentRole === 'PATIENT' && m.senderRole === 'PATIENT') {
+            isMine = true;
+        } else if (currentRole === 'PHARMACIST' && m.senderRole === 'PHARMACIST' && m.senderId && (m.senderId === currentId || m.senderId.toLowerCase().includes('pharma'))) {
+            isMine = true;
+        }
+
+        let timeStr = 'Just now';
+        if (m.timestamp) {
+            try {
+                const d = new Date(m.timestamp);
+                if (!isNaN(d.getTime())) {
+                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+            } catch (e) {}
+        }
+
+        let rxCardHtml = '';
+        if (m.prescriptionId) {
+            let pillsHtml = '';
+            if (m.prescriptionSummary) {
+                const pills = m.prescriptionSummary.split(',').map(s => s.trim()).filter(Boolean);
+                pillsHtml = `<div class="chat-rx-pills">${pills.map(p => `<span class="chat-rx-pill-item">💊 ${escapeHtml(p)}</span>`).join('')}</div>`;
+            }
+            rxCardHtml = `
+                <div class="chat-rx-attachment-card">
+                    <div class="chat-rx-header">
+                        <span>📋 Attached Rx: <strong>${escapeHtml(m.prescriptionId)}</strong></span>
+                        <span class="badge badge-success" style="font-size:0.68rem; padding:1px 6px;">VERIFIED</span>
+                    </div>
+                    ${pillsHtml}
+                </div>
+            `;
+        }
+
+        const senderLabel = isMine ? (m.senderName || 'You') : (m.senderName || (m.senderRole === 'PHARMACIST' ? 'Pharmacist' : 'Patient'));
+        const roleBadge = m.senderRole === 'PHARMACIST' ? '🩺 DGDA Pharmacist' : '👤 Patient';
+
         return `
             <div class="chat-msg ${isMine ? 'mine' : 'theirs'}">
-                <small style="display:block; opacity:0.8; font-size:0.7rem; margin-bottom:2px;">
-                    ${m.senderName} (${m.senderRole})
-                </small>
-                ${m.content}
+                <div class="chat-sender-tag">
+                    <span>${roleBadge}</span>
+                    <span>•</span>
+                    <span>${escapeHtml(senderLabel)}</span>
+                </div>
+                <div>${escapeHtml(m.content)}</div>
+                ${rxCardHtml}
+                <span class="chat-msg-time">${timeStr} ${isMine ? (m.isRead ? '✓✓' : '✓') : ''}</span>
             </div>
         `;
     }).join('');
+
     box.scrollTop = box.scrollHeight;
 }
 
-async function sendChatMessage() {
+async function sendChatMessage(customContent, rxId, rxSummary, explicitAutoReply = false) {
     const input = document.getElementById('chat-input');
-    const content = input.value.trim();
-    if (!content) return;
+    const content = (customContent !== undefined) ? customContent.trim() : (input ? input.value.trim() : '');
+
+    if (!content && !rxId) return;
+
+    if (input && customContent === undefined) {
+        input.value = '';
+    }
+
+    const currentUser = state.currentUser || {};
+    const currentId = currentUser.id || 'ML-9824-A';
+    const currentName = currentUser.name || (currentUser.role === 'PHARMACIST' ? 'Dr. Farhan Kabir' : 'Rahim Ahmed');
+    const currentRole = (currentUser.role || state.activeRole || 'PATIENT').toUpperCase();
+    const currentEmail = currentUser.email || (currentRole === 'PHARMACIST' ? 'farhan@lazzpharma.com' : 'rahim@medilink.com');
+
+    const partner = state.activeChatPartner || {};
+    let receiverId = partner.id;
+    let receiverEmail = partner.email;
+
+    if (!receiverId) {
+        if (currentRole === 'PHARMACIST') {
+            receiverId = 'ML-9824-A';
+            receiverEmail = 'rahim@medilink.com';
+        } else {
+            receiverId = state.selectedPharmacistId || 'usr_pharma_01';
+            receiverEmail = (receiverId === 'usr_pharma_02') ? 'nazmul@popularpharma.com' : 'farhan@lazzpharma.com';
+        }
+    }
+
+    const typingIndicator = document.getElementById('chat-typing-indicator');
+    const typingText = document.getElementById('chat-typing-text');
+    if (typingText) {
+        typingText.textContent = `${partner.name || 'Recipient'} is typing...`;
+    }
+    if (typingIndicator && currentRole === 'PATIENT' && explicitAutoReply) {
+        typingIndicator.style.display = 'flex';
+    }
 
     try {
-        await fetch('/api/chat/send', {
+        const payload = {
+            senderId: currentId,
+            senderName: currentName,
+            senderRole: currentRole,
+            senderEmail: currentEmail,
+            receiverId: receiverId,
+            receiverEmail: receiverEmail,
+            content: content || `Consultation regarding prescription #${rxId}`,
+            type: rxId ? 'PRESCRIPTION_CONSULT' : 'TEXT',
+            prescriptionId: rxId || null,
+            prescriptionSummary: rxSummary || null,
+            autoReply: explicitAutoReply
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                senderId: state.currentUser.id,
-                senderName: state.currentUser.name,
-                senderRole: state.currentUser.role,
-                receiverId: 'usr_pharma_01',
-                content: content
-            })
+            body: JSON.stringify(payload)
         });
-        input.value = '';
-        loadChatMessages();
+
+        if (res.ok) {
+            await loadChatMessages();
+            loadConversationsList(true);
+        } else {
+            showToast('Failed to send message.');
+            if (typingIndicator) typingIndicator.style.display = 'none';
+        }
     } catch (e) {
+        console.error('Send chat error:', e);
         showToast('Failed to send message.');
+        if (typingIndicator) typingIndicator.style.display = 'none';
     }
+}
+
+function sendQuickChatMessage(promptText, autoReply = false) {
+    const input = document.getElementById('chat-input');
+    if (input) {
+        input.value = promptText;
+        sendChatMessage(promptText, null, null, autoReply);
+        input.value = '';
+    }
+}
+
+function openChatAttachRxModal() {
+    const modal = document.getElementById('modal-chat-attach-rx');
+    const listContainer = document.getElementById('chat-attach-rx-list');
+    if (!modal || !listContainer) return;
+
+    let rxs = (state.prescriptions && state.prescriptions.length > 0) ? state.prescriptions : [];
+    if (rxs.length === 0) {
+        rxs = [
+            {
+                id: 'rx_101',
+                doctorName: 'Prof. Dr. M. A. Malek',
+                hospital: 'Dhaka Medical College Hospital',
+                date: '2026-03-01',
+                medicines: [
+                    { name: 'Napa Extra', dosage: '500mg/65mg', frequency: '1+0+1' },
+                    { name: 'Seclo 20', dosage: '20mg', frequency: '1+0+0' },
+                    { name: 'Ciprocin 500', dosage: '500mg', frequency: '1+0+1' }
+                ]
+            },
+            {
+                id: 'rx_102',
+                doctorName: 'Dr. Fatima Rahman',
+                hospital: 'Square Hospital Dhaka',
+                date: '2026-03-05',
+                medicines: [
+                    { name: 'Sergel 20', dosage: '20mg', frequency: '1+0+0' },
+                    { name: 'Montene 10', dosage: '10mg', frequency: '0+0+1' }
+                ]
+            }
+        ];
+    }
+
+    listContainer.innerHTML = rxs.map(rx => {
+        const rxId = rx.id || rx.rxId || 'rx_101';
+        const doc = rx.doctorName || 'Licensed Physician';
+        const hosp = rx.hospital || 'Hospital';
+        const meds = (rx.medicines || []).map(m => m.name || m.medicineName || '').filter(Boolean).join(', ');
+        return `
+            <div style="background:var(--bg-body, #0f172a); border:1px solid var(--border-color, #334155); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                <div style="flex:1;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <strong style="color:var(--primary, #3b82f6); font-size:0.92rem;">#${escapeHtml(rxId)}</strong>
+                        <span class="badge badge-success" style="font-size:0.65rem; padding:1px 5px;">DGDA VERIFIED</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-main, #f8fafc); font-weight:600;">${escapeHtml(doc)} • <span class="text-muted" style="font-weight:normal;">${escapeHtml(hosp)}</span></div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;"><strong>Meds:</strong> ${escapeHtml(meds || 'Formulations')}</div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="attachPrescriptionToChat('${escapeHtml(rxId)}')">
+                    Attach &amp; Consult
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+function attachPrescriptionToChat(rxId) {
+    closeModal('modal-chat-attach-rx');
+
+    let rxs = (state.prescriptions && state.prescriptions.length > 0) ? state.prescriptions : [];
+    const found = rxs.find(r => (r.id === rxId || r.rxId === rxId));
+    let medsSummary = '';
+    if (found && found.medicines) {
+        medsSummary = found.medicines.map(m => `${m.name || m.medicineName} ${m.dosage || ''}`).join(', ').trim();
+    } else {
+        medsSummary = 'Napa Extra 500mg, Seclo 20mg, Ciprocin 500mg';
+    }
+
+    const consultMsg = `I would like clinical guidance regarding my verified digital prescription #${rxId}.`;
+    sendChatMessage(consultMsg, rxId, medsSummary, false);
 }
 
 // Help Center Knowledge Base & Interactive Handlers
@@ -3838,4 +5222,1242 @@ function updateThemeOptionCards(activeOption) {
 }
 
 
+
+
+
+// ============================================================================
+// ADMIN MASTER CONTROL CENTER & TELEMETRY CONTROLLER
+// ============================================================================
+
+let adminUsersList = [];
+let adminPharmaciesList = [];
+let adminMedicinesList = [];
+let adminPrescriptionsList = [];
+let adminAuditLogs = [];
+
+// Admin Subpanel Switcher
+function switchAdminSubTab(subTabName) {
+    document.querySelectorAll('.admin-nav-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.admin-subpanel').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+    });
+
+    const activeBtn = document.getElementById(`admin-tab-btn-${subTabName}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    const activePanel = document.getElementById(`admin-subpanel-${subTabName}`);
+    if (activePanel) {
+        activePanel.classList.add('active');
+        activePanel.style.display = 'block';
+    }
+
+    if (subTabName === 'users' && adminUsersList.length === 0) {
+        loadAdminUsers();
+    } else if (subTabName === 'pharmacies' && adminPharmaciesList.length === 0) {
+        loadAdminPharmacies();
+    } else if (subTabName === 'medicines' && adminMedicinesList.length === 0) {
+        loadAdminMedicines();
+    } else if (subTabName === 'prescriptions' && adminPrescriptionsList.length === 0) {
+        loadAdminPrescriptions();
+    } else if (subTabName === 'market') {
+        loadMarketPriceData();
+        loadMarketPriceHistory();
+    }
+}
+
+// Master Admin Data Refresh
+async function loadAdminData() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/telemetry`);
+        if (res.ok) {
+            const telemetry = await res.json();
+            renderAdminTelemetry(telemetry);
+        }
+    } catch (err) {
+        console.warn('Telemetry load failed:', err);
+    }
+    loadAdminUsers();
+    loadAdminPharmacies();
+    loadAdminMedicines();
+    loadAdminPrescriptions();
+    loadMarketPriceData();
+    loadMarketPriceHistory();
+}
+
+function renderAdminTelemetry(t) {
+    const kpiUsers = document.getElementById('admin-kpi-users');
+    const kpiUsersBreakdown = document.getElementById('admin-kpi-users-breakdown');
+    const kpiMeds = document.getElementById('admin-kpi-medicines');
+    const kpiPharmacies = document.getElementById('admin-kpi-pharmacies');
+    const kpiRx = document.getElementById('admin-kpi-rx');
+    const kpiRxBreakdown = document.getElementById('admin-kpi-rx-breakdown');
+    const kpiHealth = document.getElementById('admin-kpi-health');
+    const kpiMem = document.getElementById('admin-kpi-memory');
+
+    const counts = t.counts || {};
+    if (kpiUsers) kpiUsers.textContent = counts.totalUsers || 0;
+    if (kpiUsersBreakdown) {
+        kpiUsersBreakdown.textContent = `Patients: ${counts.patients || 0} | Pharmacists: ${counts.pharmacists || 0} | Admins: ${counts.admins || 0}`;
+    }
+    if (kpiMeds) kpiMeds.textContent = counts.medicines || 0;
+    if (kpiPharmacies) kpiPharmacies.textContent = counts.pharmacies || 0;
+    if (kpiRx) kpiRx.textContent = counts.prescriptions || 0;
+    if (kpiRxBreakdown) {
+        kpiRxBreakdown.textContent = `Pending: ${counts.prescriptionsPending || 0} | Verified: ${counts.prescriptionsVerified || 0} | Dispensed: ${counts.prescriptionsDispensed || 0}`;
+    }
+
+    const health = t.health || t.system || {};
+    if (kpiHealth) kpiHealth.textContent = health.status || 'HEALTHY';
+    if (kpiMem) {
+        kpiMem.textContent = `Memory: ${health.usedMemoryMb || 0} / ${health.maxMemoryMb || 0} MB | Uptime: ${health.uptime || 'Active'}`;
+    }
+
+    appendAdminAuditLine(`[TELEMETRY_SYNC] Polled. DB: ${health.database || 'CONNECTED'}`);
+}
+
+// ----------------------------------------------------
+// 1. User Management (CRUD)
+// ----------------------------------------------------
+async function loadAdminUsers() {
+    const tbody = document.getElementById('admin-users-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell">Loading users from PostgreSQL database...</td></tr>';
+    }
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/users`);
+        if (res.ok) {
+            const data = await res.json();
+            adminUsersList = data.users || (Array.isArray(data) ? data : []);
+            renderAdminUsersTable(adminUsersList);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell text-error">Failed to fetch users.</td></tr>';
+        }
+    } catch (e) {
+        console.error('Error loading admin users:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="table-loading-cell text-error">Error connecting to server.</td></tr>`;
+    }
+}
+
+function renderAdminUsersTable(users) {
+    const tbody = document.getElementById('admin-users-table-body');
+    if (!tbody) return;
+
+    if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell">No users registered matching criteria.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+        const role = (u.role || 'PATIENT').toUpperCase();
+        let roleBadgeClass = 'badge-patient';
+        let roleEmoji = '👤';
+        if (role === 'PHARMACIST') {
+            roleBadgeClass = 'badge-pharmacist';
+            roleEmoji = '🩺';
+        } else if (role === 'ADMIN') {
+            roleBadgeClass = 'badge-admin';
+            roleEmoji = '🛡️';
+        }
+
+        const contact = u.phone || u.email || 'None';
+        const address = u.address || (u.pharmacyName ? `Store: ${u.pharmacyName}` : 'Dhaka, Bangladesh');
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(u.id || '')}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:1.4rem;">${roleEmoji}</span>
+                        <div>
+                            <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(u.name || 'Unnamed')}</strong>
+                            <small style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(u.email || '')}</small>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="user-role-pill ${roleBadgeClass}">${role}</span></td>
+                <td>
+                    <div style="font-size:0.85rem;">📞 ${escapeHtml(contact)}</div>
+                    <small style="color:var(--text-muted);">${escapeHtml(address)}</small>
+                </td>
+                <td>
+                    <span style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:2px 6px; border-radius:4px;">
+                        ${role === 'PHARMACIST' && u.licenseNumber ? `Lic: ${escapeHtml(u.licenseNumber)}` : 'Active / Hash Protected'}
+                    </span>
+                </td>
+                <td style="text-align:right;">
+                    <div class="admin-table-actions">
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditUserModal('${u.id}')" title="Edit User">✏️ Edit</button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminUser('${u.id}', '${escapeHtml(u.name)}')" title="Delete User">🗑️ Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterAdminUsersTable() {
+    const search = (document.getElementById('admin-user-search')?.value || '').toLowerCase();
+    const roleFilter = document.getElementById('admin-user-role-filter')?.value || 'ALL';
+
+    const filtered = adminUsersList.filter(u => {
+        const matchesRole = roleFilter === 'ALL' || (u.role || '').toUpperCase() === roleFilter;
+        const matchesSearch = !search ||
+            (u.name && u.name.toLowerCase().includes(search)) ||
+            (u.email && u.email.toLowerCase().includes(search)) ||
+            (u.id && u.id.toLowerCase().includes(search));
+        return matchesRole && matchesSearch;
+    });
+
+    renderAdminUsersTable(filtered);
+}
+
+function toggleAdminUserRoleFields() {
+    const role = document.getElementById('admin-user-role')?.value;
+    const patientFields = document.getElementById('admin-role-patient-fields');
+    const pharmaFields = document.getElementById('admin-role-pharma-fields');
+    const adminFields = document.getElementById('admin-role-admin-fields');
+    const ecGroup = document.getElementById('admin-group-patient-ec');
+
+    if (patientFields) patientFields.style.display = (role === 'PATIENT') ? 'block' : 'none';
+    if (ecGroup) ecGroup.style.display = (role === 'PATIENT') ? 'block' : 'none';
+    if (pharmaFields) pharmaFields.style.display = (role === 'PHARMACIST') ? 'block' : 'none';
+    if (adminFields) adminFields.style.display = (role === 'ADMIN') ? 'block' : 'none';
+}
+
+function openAdminAddUserModal() {
+    document.getElementById('admin-user-id').value = '';
+    document.getElementById('admin-user-modal-title').textContent = 'Create New User';
+    document.getElementById('btn-admin-user-submit').textContent = 'Save User to Database';
+    document.getElementById('admin-user-name').value = '';
+    document.getElementById('admin-user-email').value = '';
+    document.getElementById('admin-user-password').value = '';
+    document.getElementById('admin-user-password').required = true;
+    document.getElementById('admin-user-password-label').textContent = 'Password *';
+    document.getElementById('admin-user-phone').value = '';
+    document.getElementById('admin-user-emergency').value = '';
+    document.getElementById('admin-user-address').value = '';
+    document.getElementById('admin-user-pharma-name').value = '';
+    document.getElementById('admin-user-pharma-license').value = '';
+    document.getElementById('admin-user-role').value = 'PATIENT';
+    toggleAdminUserRoleFields();
+    openModal('modal-admin-user');
+}
+
+function openAdminEditUserModal(userId) {
+    const user = adminUsersList.find(u => u.id === userId);
+    if (!user) return;
+
+    document.getElementById('admin-user-id').value = user.id;
+    document.getElementById('admin-user-modal-title').textContent = `Edit User: ${user.name}`;
+    document.getElementById('btn-admin-user-submit').textContent = 'Update User';
+    document.getElementById('admin-user-name').value = user.name || '';
+    document.getElementById('admin-user-email').value = user.email || '';
+    document.getElementById('admin-user-password').value = '';
+    document.getElementById('admin-user-password').required = false;
+    document.getElementById('admin-user-password-label').textContent = 'Password (leave blank to keep current)';
+    document.getElementById('admin-user-phone').value = user.phone || '';
+    document.getElementById('admin-user-emergency').value = user.emergencyContact || '';
+    document.getElementById('admin-user-address').value = user.address || '';
+    document.getElementById('admin-user-pharma-name').value = user.pharmacyName || '';
+    document.getElementById('admin-user-pharma-license').value = user.licenseNumber || '';
+    document.getElementById('admin-user-role').value = (user.role || 'PATIENT').toUpperCase();
+    toggleAdminUserRoleFields();
+    openModal('modal-admin-user');
+}
+
+async function handleAdminUserSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('admin-user-id')?.value;
+    const name = document.getElementById('admin-user-name')?.value?.trim();
+    const email = document.getElementById('admin-user-email')?.value?.trim();
+    const password = document.getElementById('admin-user-password')?.value;
+    const role = document.getElementById('admin-user-role')?.value;
+    const phone = document.getElementById('admin-user-phone')?.value?.trim();
+    const emergencyContact = document.getElementById('admin-user-emergency')?.value?.trim();
+    const address = document.getElementById('admin-user-address')?.value?.trim();
+    const pharmacyName = document.getElementById('admin-user-pharma-name')?.value?.trim();
+    const licenseNumber = document.getElementById('admin-user-pharma-license')?.value?.trim();
+
+    const payload = {
+        name,
+        email,
+        role,
+        phone,
+        emergencyContact,
+        address,
+        pharmacyName,
+        licenseNumber
+    };
+    if (password) {
+        payload.password = password;
+    }
+
+    try {
+        let res;
+        if (id) {
+            res = await fetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast(id ? '✅ User updated successfully!' : '✅ User created successfully!');
+            closeModal('modal-admin-user');
+            loadAdminUsers();
+            loadAdminData();
+        } else {
+            showToast(data.message || 'Failed to save user.', 'error');
+        }
+    } catch (err) {
+        console.error('Error saving admin user:', err);
+        showToast('Network error while saving user.', 'error');
+    }
+}
+
+async function deleteAdminUser(userId, userName) {
+    if (!confirm(`Are you sure you want to permanently delete user "${userName || userId}"? This cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(userId)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast(`🗑️ User deleted successfully.`);
+            loadAdminUsers();
+            loadAdminData();
+        } else {
+            showToast(data.message || 'Failed to delete user.', 'error');
+        }
+    } catch (e) {
+        console.error('Error deleting user:', e);
+        showToast('Error deleting user.', 'error');
+    }
+}
+
+// ----------------------------------------------------
+// CSV DATA EXPORT UTILITIES (Client-side reporting)
+// ----------------------------------------------------
+function downloadCsvFile(filename, csvContent) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportUsersCsv() {
+    if (!adminUsersList || adminUsersList.length === 0) {
+        showToast('No user records available to export.', 'warning');
+        return;
+    }
+    const headers = ['User ID', 'Full Name', 'Email Address', 'Account Role', 'Phone Number', 'Address / Store Details'];
+    const rows = adminUsersList.map(u => [
+        `"${(u.id || '').replace(/"/g, '""')}"`,
+        `"${(u.name || '').replace(/"/g, '""')}"`,
+        `"${(u.email || '').replace(/"/g, '""')}"`,
+        `"${(u.role || '').replace(/"/g, '""')}"`,
+        `"${(u.phone || '').replace(/"/g, '""')}"`,
+        `"${(u.address || u.pharmacyName || '').replace(/"/g, '""')}"`
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_users_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Users directory exported to CSV successfully!');
+}
+
+function exportPharmaciesCsv() {
+    if (!adminPharmaciesList || adminPharmaciesList.length === 0) {
+        showToast('No pharmacy records available to export.', 'warning');
+        return;
+    }
+    const headers = ['Pharmacy ID', 'Pharmacy Name', 'City Area', 'Physical Street Address', 'Phone Hotline', '24 Hours Open', 'Emergency Delivery', 'Inventory SKUs'];
+    const rows = adminPharmaciesList.map(p => [
+        `"${(p.id || '').replace(/"/g, '""')}"`,
+        `"${(p.name || '').replace(/"/g, '""')}"`,
+        `"${(p.area || '').replace(/"/g, '""')}"`,
+        `"${(p.address || '').replace(/"/g, '""')}"`,
+        `"${(p.phone || '').replace(/"/g, '""')}"`,
+        p.is24Hours ? 'YES' : 'NO',
+        p.hasEmergencyDelivery ? 'YES' : 'NO',
+        p.stockCount || 0
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_pharmacies_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Pharmacy network registry exported to CSV successfully!');
+}
+
+function exportMedicinesCsv() {
+    if (!adminMedicinesList || adminMedicinesList.length === 0) {
+        showToast('No medicine catalog records available to export.', 'warning');
+        return;
+    }
+    const headers = ['Medicine ID', 'Brand Name', 'Generic Formulation', 'Pharmaceutical Company', 'Strength', 'Formulation', 'Unit Price (BDT ৳)', 'Prescription Required'];
+    const rows = adminMedicinesList.map(m => [
+        `"${(m.id || '').replace(/"/g, '""')}"`,
+        `"${(m.brandName || '').replace(/"/g, '""')}"`,
+        `"${(m.genericName || '').replace(/"/g, '""')}"`,
+        `"${(m.company || '').replace(/"/g, '""')}"`,
+        `"${(m.strength || '').replace(/"/g, '""')}"`,
+        `"${(m.formulation || '').replace(/"/g, '""')}"`,
+        typeof m.unitPrice === 'number' ? m.unitPrice.toFixed(2) : (m.unitPrice || '0.00'),
+        m.prescriptionRequired ? 'YES (Rx)' : 'NO (OTC)'
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_medicines_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Medicine catalog exported to CSV successfully!');
+}
+
+// ----------------------------------------------------
+// 2. Pharmacy Network Management (CRUD)
+// ----------------------------------------------------
+async function loadAdminPharmacies() {
+    const tbody = document.getElementById('admin-pharmacies-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">Loading pharmacy network from PostgreSQL database...</td></tr>';
+    }
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/pharmacies`);
+        if (res.ok) {
+            const data = await res.json();
+            adminPharmaciesList = data.pharmacies || (Array.isArray(data) ? data : []);
+            renderAdminPharmaciesTable(adminPharmaciesList);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell text-error">Failed to fetch pharmacies.</td></tr>';
+        }
+    } catch (e) {
+        console.error('Error loading admin pharmacies:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell text-error">Error connecting to server.</td></tr>';
+    }
+}
+
+function renderAdminPharmaciesTable(pharmacies) {
+    const tbody = document.getElementById('admin-pharmacies-table-body');
+    if (!tbody) return;
+
+    if (!pharmacies || pharmacies.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">No partner pharmacies registered matching criteria.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = pharmacies.map(p => {
+        const is24hBadge = p.is24Hours
+            ? '<span class="badge-24h">✓ 24/7 Open</span>'
+            : '<span class="badge-standard-hours">Standard Hours</span>';
+
+        const emergencyBadge = p.hasEmergencyDelivery
+            ? '<span class="badge-emergency-yes">⚡ Active</span>'
+            : '<span class="badge-emergency-no">Standard</span>';
+
+        const stockSkus = p.stockCount !== undefined ? p.stockCount : 0;
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(p.id || '')}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:1.3rem;">🏥</span>
+                        <div>
+                            <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(p.name || 'Unnamed')}</strong>
+                            <small style="color:var(--primary-blue); font-weight:700; font-size:0.78rem;">📍 ${escapeHtml(p.area || 'Dhaka')}</small>
+                        </div>
+                    </div>
+                </td>
+                <td style="max-width:240px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(p.address || '')}</td>
+                <td><span style="font-size:0.85rem; font-weight:600;">📞 ${escapeHtml(p.phone || 'N/A')}</span></td>
+                <td>${is24hBadge}</td>
+                <td>${emergencyBadge}</td>
+                <td><span class="badge-tag" style="font-weight:700;">${stockSkus} SKUs</span></td>
+                <td style="text-align:right;">
+                    <div class="admin-table-actions">
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditPharmacyModal('${p.id}')" title="Edit Pharmacy">✏️ Edit</button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminPharmacy('${p.id}', '${escapeHtml(p.name)}')" title="Delete Pharmacy">🗑️ Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterAdminPharmaciesTable() {
+    const search = (document.getElementById('admin-pharma-search')?.value || '').toLowerCase();
+    const hoursFilter = document.getElementById('admin-pharma-filter-hours')?.value || 'ALL';
+
+    const filtered = adminPharmaciesList.filter(p => {
+        const matchesSearch = !search ||
+            (p.name && p.name.toLowerCase().includes(search)) ||
+            (p.address && p.address.toLowerCase().includes(search)) ||
+            (p.area && p.area.toLowerCase().includes(search)) ||
+            (p.id && p.id.toLowerCase().includes(search));
+
+        let matchesHours = true;
+        if (hoursFilter === '24H') matchesHours = !!p.is24Hours;
+        else if (hoursFilter === 'EMERGENCY') matchesHours = !!p.hasEmergencyDelivery;
+
+        return matchesSearch && matchesHours;
+    });
+
+    renderAdminPharmaciesTable(filtered);
+}
+
+function openAdminAddPharmacyModal() {
+    document.getElementById('admin-pharma-id').value = '';
+    document.getElementById('admin-pharma-modal-title').textContent = 'Register Partner Pharmacy';
+    document.getElementById('btn-admin-pharma-submit').textContent = 'Save Partner Pharmacy';
+    document.getElementById('admin-pharma-name').value = '';
+    document.getElementById('admin-pharma-area').value = '';
+    document.getElementById('admin-pharma-address').value = '';
+    document.getElementById('admin-pharma-phone').value = '';
+    document.getElementById('admin-pharma-custom-id').value = '';
+    document.getElementById('admin-pharma-lat').value = '23.7461';
+    document.getElementById('admin-pharma-lng').value = '90.3742';
+    document.getElementById('admin-pharma-24h').checked = true;
+    document.getElementById('admin-pharma-emergency').checked = true;
+    openModal('modal-admin-pharmacy');
+}
+
+function openAdminEditPharmacyModal(pharmaId) {
+    const p = adminPharmaciesList.find(item => item.id === pharmaId);
+    if (!p) return;
+
+    document.getElementById('admin-pharma-id').value = p.id;
+    document.getElementById('admin-pharma-modal-title').textContent = `Edit Pharmacy: ${p.name}`;
+    document.getElementById('btn-admin-pharma-submit').textContent = 'Update Partner Pharmacy';
+    document.getElementById('admin-pharma-name').value = p.name || '';
+    document.getElementById('admin-pharma-area').value = p.area || '';
+    document.getElementById('admin-pharma-address').value = p.address || '';
+    document.getElementById('admin-pharma-phone').value = p.phone || '';
+    document.getElementById('admin-pharma-custom-id').value = p.id || '';
+    document.getElementById('admin-pharma-lat').value = p.latitude || '23.7461';
+    document.getElementById('admin-pharma-lng').value = p.longitude || '90.3742';
+    document.getElementById('admin-pharma-24h').checked = !!p.is24Hours;
+    document.getElementById('admin-pharma-emergency').checked = !!p.hasEmergencyDelivery;
+    openModal('modal-admin-pharmacy');
+}
+
+async function handleAdminPharmacySubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('admin-pharma-id')?.value;
+    const name = document.getElementById('admin-pharma-name')?.value?.trim();
+    const area = document.getElementById('admin-pharma-area')?.value?.trim();
+    const address = document.getElementById('admin-pharma-address')?.value?.trim();
+    const phone = document.getElementById('admin-pharma-phone')?.value?.trim();
+    const customId = document.getElementById('admin-pharma-custom-id')?.value?.trim();
+    const latitude = parseFloat(document.getElementById('admin-pharma-lat')?.value) || 23.7461;
+    const longitude = parseFloat(document.getElementById('admin-pharma-lng')?.value) || 90.3742;
+    const is24Hours = document.getElementById('admin-pharma-24h')?.checked || false;
+    const hasEmergencyDelivery = document.getElementById('admin-pharma-emergency')?.checked || false;
+
+    const payload = {
+        name,
+        area,
+        address,
+        phone,
+        latitude,
+        longitude,
+        is24Hours,
+        hasEmergencyDelivery
+    };
+    if (customId && !id) {
+        payload.id = customId;
+    }
+
+    try {
+        let res;
+        if (id) {
+            res = await fetch(`${API_BASE_URL}/api/admin/pharmacies/${encodeURIComponent(id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            res = await fetch(`${API_BASE_URL}/api/admin/pharmacies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        const data = await res.json();
+        if (res.ok && data.status === 'SUCCESS') {
+            showToast(id ? '✅ Pharmacy updated successfully!' : '✅ Partner pharmacy registered successfully!');
+            closeModal('modal-admin-pharmacy');
+            loadAdminPharmacies();
+            loadAdminData();
+            if (typeof loadPharmacies === 'function') loadPharmacies();
+        } else {
+            showToast(data.message || 'Failed to save pharmacy.', 'error');
+        }
+    } catch (err) {
+        console.error('Error saving pharmacy:', err);
+        showToast('Network error while saving pharmacy.', 'error');
+    }
+}
+
+async function deleteAdminPharmacy(pharmaId, pharmaName) {
+    if (!confirm(`Are you sure you want to remove pharmacy "${pharmaName || pharmaId}" from the platform registry? This will also remove its associated stock records.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/pharmacies/${encodeURIComponent(pharmaId)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'SUCCESS') {
+            showToast(`🗑️ Pharmacy removed from platform registry.`);
+            loadAdminPharmacies();
+            loadAdminData();
+            if (typeof loadPharmacies === 'function') loadPharmacies();
+        } else {
+            showToast(data.message || 'Failed to delete pharmacy.', 'error');
+        }
+    } catch (e) {
+        console.error('Error deleting pharmacy:', e);
+        showToast('Error deleting pharmacy.', 'error');
+    }
+}
+
+// ----------------------------------------------------
+// 3. Medicine Catalog CRUD
+// ----------------------------------------------------
+async function loadAdminMedicines() {
+    const tbody = document.getElementById('admin-medicines-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">Loading medicine repository...</td></tr>';
+    }
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/medicines`);
+        if (res.ok) {
+            const data = await res.json();
+            adminMedicinesList = data.medicines || (Array.isArray(data) ? data : []);
+            populateCompanyFilter();
+            renderAdminMedicinesTable(adminMedicinesList);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell text-error">Failed to fetch medicines.</td></tr>';
+        }
+    } catch (err) {
+        console.error('Error loading admin medicines:', err);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell text-error">Network error.</td></tr>';
+    }
+}
+
+function populateCompanyFilter() {
+    const select = document.getElementById('admin-med-company-filter');
+    if (!select) return;
+    const companies = Array.from(new Set(adminMedicinesList.map(m => m.company).filter(Boolean))).sort();
+    select.innerHTML = '<option value="ALL">All Manufacturers</option>' +
+        companies.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
+
+function renderAdminMedicinesTable(meds) {
+    const tbody = document.getElementById('admin-medicines-table-body');
+    if (!tbody) return;
+
+    if (!meds || meds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">No medicines found matching filters.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = meds.map(m => {
+        const price = typeof m.unitPrice === 'number' ? m.unitPrice.toFixed(2) : (m.unitPrice || '0.00');
+        const rxRequired = m.prescriptionRequired ? '<span class="status-badge badge-warning">Rx Required</span>' : '<span class="status-badge badge-success">OTC</span>';
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(m.id || '')}</td>
+                <td><strong style="color:var(--text-heading); font-size:0.95rem;">${escapeHtml(m.brandName || '')}</strong></td>
+                <td><span style="font-style:italic; color:var(--text-muted);">${escapeHtml(m.genericName || '')}</span></td>
+                <td>${escapeHtml(m.company || '')}</td>
+                <td><span class="badge-tag">${escapeHtml(m.strength || '')} (${escapeHtml(m.formulation || 'Tab')})</span></td>
+                <td><strong style="color:var(--primary-blue); font-size:1rem;">৳ ${price}</strong></td>
+                <td>${rxRequired}</td>
+                <td style="text-align:right;">
+                    <div class="admin-table-actions">
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditMedicineModal('${m.id}')" title="Edit Medicine">✏️ Edit</button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminMedicine('${m.id}', '${escapeHtml(m.brandName)}')" title="Delete Medicine">🗑️ Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterAdminMedicinesTable() {
+    const search = (document.getElementById('admin-med-search')?.value || '').toLowerCase();
+    const company = document.getElementById('admin-med-company-filter')?.value || 'ALL';
+
+    const filtered = adminMedicinesList.filter(m => {
+        const matchesComp = company === 'ALL' || m.company === company;
+        const matchesSearch = !search ||
+            (m.brandName && m.brandName.toLowerCase().includes(search)) ||
+            (m.genericName && m.genericName.toLowerCase().includes(search)) ||
+            (m.company && m.company.toLowerCase().includes(search)) ||
+            (m.id && m.id.toLowerCase().includes(search));
+        return matchesComp && matchesSearch;
+    });
+
+    renderAdminMedicinesTable(filtered);
+}
+
+function openAdminAddMedicineModal() {
+    document.getElementById('admin-med-id').value = '';
+    document.getElementById('admin-med-modal-title').textContent = 'Add Medicine to Catalog';
+    document.getElementById('btn-admin-med-submit').textContent = 'Save Medicine to Repository';
+    document.getElementById('admin-med-brand').value = '';
+    document.getElementById('admin-med-generic').value = '';
+    document.getElementById('admin-med-company').value = '';
+    document.getElementById('admin-med-strength').value = '';
+    document.getElementById('admin-med-formulation').value = 'Tablet';
+    document.getElementById('admin-med-price').value = '';
+    document.getElementById('admin-med-category').value = '';
+    document.getElementById('admin-med-rx-req').checked = false;
+    document.getElementById('admin-med-side-effects').value = '';
+    openModal('modal-admin-medicine');
+}
+
+function openAdminEditMedicineModal(medId) {
+    const med = adminMedicinesList.find(m => m.id === medId);
+    if (!med) return;
+
+    document.getElementById('admin-med-id').value = med.id;
+    document.getElementById('admin-med-modal-title').textContent = `Edit Medicine: ${med.brandName}`;
+    document.getElementById('btn-admin-med-submit').textContent = 'Update Medicine';
+    document.getElementById('admin-med-brand').value = med.brandName || '';
+    document.getElementById('admin-med-generic').value = med.genericName || '';
+    document.getElementById('admin-med-company').value = med.company || '';
+    document.getElementById('admin-med-strength').value = med.strength || '';
+    document.getElementById('admin-med-formulation').value = med.formulation || 'Tablet';
+    document.getElementById('admin-med-price').value = med.unitPrice || '';
+    document.getElementById('admin-med-category').value = med.therapeuticClass || '';
+    document.getElementById('admin-med-rx-req').checked = !!med.prescriptionRequired;
+    document.getElementById('admin-med-side-effects').value = med.sideEffects || '';
+    openModal('modal-admin-medicine');
+}
+
+async function handleAdminMedicineSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('admin-med-id')?.value;
+    const brandName = document.getElementById('admin-med-brand')?.value?.trim();
+    const genericName = document.getElementById('admin-med-generic')?.value?.trim();
+    const company = document.getElementById('admin-med-company')?.value?.trim();
+    const strength = document.getElementById('admin-med-strength')?.value?.trim();
+    const formulation = document.getElementById('admin-med-formulation')?.value;
+    const unitPrice = parseFloat(document.getElementById('admin-med-price')?.value) || 0;
+    const therapeuticClass = document.getElementById('admin-med-category')?.value?.trim();
+    const prescriptionRequired = document.getElementById('admin-med-rx-req')?.checked || false;
+    const sideEffects = document.getElementById('admin-med-side-effects')?.value?.trim();
+
+    const payload = {
+        brandName,
+        genericName,
+        company,
+        strength,
+        formulation,
+        unitPrice,
+        therapeuticClass,
+        prescriptionRequired,
+        sideEffects
+    };
+
+    try {
+        let res;
+        if (id) {
+            res = await fetch(`${API_BASE_URL}/api/admin/medicines/${encodeURIComponent(id)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            res = await fetch(`${API_BASE_URL}/api/admin/medicines`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast(id ? '✅ Medicine updated!' : '✅ Medicine added to catalog!');
+            closeModal('modal-admin-medicine');
+            loadAdminMedicines();
+            loadAdminData();
+            if (typeof loadMedicines === 'function') loadMedicines();
+        } else {
+            showToast(data.message || 'Failed to save medicine.', 'error');
+        }
+    } catch (err) {
+        console.error('Error saving medicine:', err);
+        showToast('Network error while saving medicine.', 'error');
+    }
+}
+
+async function deleteAdminMedicine(medId, medName) {
+    if (!confirm(`Delete "${medName || medId}" from catalog? This will remove all associated stock listings.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/medicines/${encodeURIComponent(medId)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast('🗑️ Medicine removed from catalog.');
+            loadAdminMedicines();
+            loadAdminData();
+            if (typeof loadMedicines === 'function') loadMedicines();
+        } else {
+            showToast(data.message || 'Failed to delete medicine.', 'error');
+        }
+    } catch (e) {
+        console.error('Error deleting medicine:', e);
+        showToast('Error deleting medicine.', 'error');
+    }
+}
+
+// ----------------------------------------------------
+// 3. Prescription Master Oversight Queue
+// ----------------------------------------------------
+async function loadAdminPrescriptions() {
+    const tbody = document.getElementById('admin-prescriptions-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">Loading prescription master queue...</td></tr>';
+    }
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/prescriptions`);
+        if (res.ok) {
+            const data = await res.json();
+            adminPrescriptionsList = data.prescriptions || (Array.isArray(data) ? data : []);
+            renderAdminPrescriptionsTable(adminPrescriptionsList);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Failed to fetch prescriptions.</td></tr>';
+        }
+    } catch (e) {
+        console.error('Error loading prescriptions:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Network error.</td></tr>';
+    }
+}
+
+function renderAdminPrescriptionsTable(rxList) {
+    const tbody = document.getElementById('admin-prescriptions-table-body');
+    if (!tbody) return;
+
+    if (!rxList || rxList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">No prescriptions recorded in system.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = rxList.map(rx => {
+        const status = (rx.status || 'UPLOADED').toUpperCase();
+        let statusBadge = `<span class="status-badge badge-warning">Pending (${status})</span>`;
+        if (status === 'VERIFIED') statusBadge = '<span class="status-badge badge-success">✓ Verified Genuine</span>';
+        else if (status === 'DISPENSED') statusBadge = '<span class="status-badge badge-info">📦 Dispensed</span>';
+        else if (status === 'REJECTED') statusBadge = '<span class="status-badge badge-danger">✕ Flagged / Rejected</span>';
+
+        const itemsCount = (rx.items && Array.isArray(rx.items)) ? rx.items.length : 0;
+        const itemsText = itemsCount > 0
+            ? rx.items.map(i => `${i.medicineName || i.dosage || ''} (${i.frequency || 'Daily'})`).join(', ')
+            : (rx.rawOcrText ? rx.rawOcrText.substring(0, 60) + '...' : 'Pending OCR extraction');
+
+        const uploadDate = rx.uploadedAt ? new Date(rx.uploadedAt).toLocaleString() : 'Recent';
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.82rem; font-weight:700; color:var(--text-heading);">${escapeHtml(rx.id || '')}</td>
+                <td>
+                    <strong>${escapeHtml(rx.patientName || 'Anonymous Patient')}</strong>
+                    <div style="font-size:0.75rem; color:var(--text-muted); font-family:'JetBrains Mono', monospace;">${escapeHtml(rx.patientId || '')}</div>
+                </td>
+                <td>
+                    <div style="font-weight:600; font-size:0.88rem;">${escapeHtml(rx.doctorName || 'Dr. Assigned')}</div>
+                    <small style="color:var(--text-muted);">${escapeHtml(rx.hospitalName || 'General Hospital')}</small>
+                </td>
+                <td>
+                    <div style="max-width:280px; font-size:0.82rem; line-height:1.4; color:var(--text-muted);" title="${escapeHtml(itemsText)}">
+                        ${escapeHtml(itemsText)}
+                    </div>
+                </td>
+                <td style="font-size:0.8rem; color:var(--text-muted);">${uploadDate}</td>
+                <td>${statusBadge}</td>
+                <td style="text-align:right;">
+                    <div class="admin-table-actions">
+                        <select onchange="adminUpdateRxStatus('${rx.id}', this.value)" style="padding:4px 8px; font-size:0.78rem; border-radius:6px; border:1px solid #cbd5e1; background:var(--bg-color); font-weight:600;">
+                            <option value="">-- Change State --</option>
+                            <option value="VERIFIED" ${status === 'VERIFIED' ? 'selected' : ''}>Verify Genuine</option>
+                            <option value="DISPENSED" ${status === 'DISPENSED' ? 'selected' : ''}>Mark Dispensed</option>
+                            <option value="UPLOADED" ${status === 'UPLOADED' ? 'selected' : ''}>Reset to Uploaded</option>
+                            <option value="REJECTED" ${status === 'REJECTED' ? 'selected' : ''}>Flag / Reject</option>
+                        </select>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterAdminPrescriptionsTable() {
+    const search = (document.getElementById('admin-rx-search')?.value || '').toLowerCase();
+    const statusFilter = document.getElementById('admin-rx-status-filter')?.value || 'ALL';
+
+    const filtered = adminPrescriptionsList.filter(rx => {
+        const matchesStatus = statusFilter === 'ALL' || (rx.status || '').toUpperCase() === statusFilter;
+        const matchesSearch = !search ||
+            (rx.id && rx.id.toLowerCase().includes(search)) ||
+            (rx.patientName && rx.patientName.toLowerCase().includes(search)) ||
+            (rx.doctorName && rx.doctorName.toLowerCase().includes(search));
+        return matchesStatus && matchesSearch;
+    });
+
+    renderAdminPrescriptionsTable(filtered);
+}
+
+async function adminUpdateRxStatus(rxId, newStatus) {
+    if (!newStatus) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/prescriptions/${encodeURIComponent(rxId)}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast(`Prescription ${rxId} status changed to ${newStatus}.`);
+            loadAdminPrescriptions();
+            loadAdminData();
+            if (typeof loadPrescriptions === 'function') loadPrescriptions();
+        } else {
+            showToast(data.message || 'Failed to update status.', 'error');
+        }
+    } catch (e) {
+        console.error('Error updating prescription status:', e);
+        showToast('Network error while updating prescription.', 'error');
+    }
+}
+
+// ----------------------------------------------------
+// 4. Global Broadcast & Live Audit Stream
+// ----------------------------------------------------
+async function submitAdminBroadcast() {
+    const textarea = document.getElementById('admin-broadcast-text');
+    const message = (textarea?.value || '').trim();
+
+    if (!message) {
+        showToast('Please type a message before broadcasting.', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: message,
+                type: 'SYSTEM_ANNOUNCEMENT',
+                target: 'ALL'
+            })
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast('🚀 Global live announcement dispatched to all connected users!');
+            appendAdminAuditLine(`[ADMIN_DISPATCH] "${message}" broadcast to all sessions.`);
+            if (textarea) textarea.value = '';
+        } else {
+            showToast(data.message || 'Failed to dispatch broadcast.', 'error');
+        }
+    } catch (e) {
+        console.error('Error broadcasting alert:', e);
+        showToast('Error broadcasting alert.', 'error');
+    }
+}
+
+function appendAdminAuditLine(lineText) {
+    const feed = document.getElementById('admin-audit-feed');
+    if (!feed) return;
+
+    const time = new Date().toLocaleTimeString();
+    const line = document.createElement('div');
+    line.className = 'terminal-line';
+    line.textContent = `[${time}] ${lineText}`;
+
+    feed.insertBefore(line, feed.firstChild);
+
+    while (feed.children.length > 60) {
+        feed.removeChild(feed.lastChild);
+    }
+}
+
+// ==========================================
+// BANGLADESH MARKET LIVE PRICE CONTROLLER & SSE
+// ==========================================
+function handleLivePriceUpdateEvent(raw) {
+    console.log('[LIVE_MARKET_PRICE_EVENT]', raw);
+    
+    // Pattern: PRICE_UPDATE: Napa Extra (ID 1) changed from ৳2.50 to ৳3.00 (20.0%) via DGDA Bangladesh Gazetted Price Update
+    const match = raw.match(/PRICE_UPDATE:\s*(.+?)\s*\(ID\s*(\d+)\)\s*changed\s*from\s*৳([\d.]+)\s*to\s*৳([\d.]+)\s*\(([+-]?[\d.]+)%\)\s*via\s*(.+)/i);
+    
+    let brandName = 'Medicine';
+    let medId = null;
+    let oldPrice = 0;
+    let newPrice = 0;
+    let pct = '0.0%';
+    let source = 'DGDA Bangladesh';
+
+    if (match) {
+        brandName = match[1].trim();
+        medId = parseInt(match[2], 10);
+        oldPrice = parseFloat(match[3]);
+        newPrice = parseFloat(match[4]);
+        pct = match[5];
+        source = match[6].trim();
+    } else {
+        // Fallback simple extract
+        const parts = raw.replace('PRICE_UPDATE:', '').trim();
+        brandName = parts.split(' ')[0] || 'Medicine';
+    }
+
+    // 1. Update state.medicines cache in real-time
+    if (state.medicines && state.medicines.length > 0) {
+        const found = state.medicines.find(m => (medId && m.id === medId) || m.brandName.toLowerCase() === brandName.toLowerCase());
+        if (found) {
+            found.unitPrice = newPrice;
+        }
+    }
+
+    // 2. Dynamic Card Price Badges Animation without reload
+    const priceElements = [];
+    if (medId) {
+        const el = document.getElementById(`med-price-${medId}`);
+        if (el) priceElements.push(el);
+    }
+    document.querySelectorAll(`[data-med-id="${medId}"] .med-price`).forEach(el => {
+        if (!priceElements.includes(el)) priceElements.push(el);
+    });
+
+    const isIncrease = newPrice >= oldPrice;
+    const flashClass = isIncrease ? 'price-flash-up' : 'price-flash-down';
+    const directionIcon = isIncrease ? '📈' : '📉';
+
+    priceElements.forEach(el => {
+        el.textContent = `BDT ${newPrice.toFixed(2)}`;
+        el.setAttribute('data-price', newPrice);
+        el.classList.remove('price-flash-up', 'price-flash-down');
+        void el.offsetWidth; // Trigger CSS reflow
+        el.classList.add(flashClass);
+    });
+
+    // 3. Update Cart if this medicine is in user's cart
+    if (state.cart && Array.isArray(state.cart)) {
+        let cartUpdated = false;
+        state.cart.forEach(item => {
+            if ((medId && item.medicineId === medId) || (item.name && item.name.toLowerCase() === brandName.toLowerCase())) {
+                item.price = newPrice;
+                cartUpdated = true;
+            }
+        });
+        if (cartUpdated && typeof renderCart === 'function') {
+            renderCart();
+        }
+    }
+
+    // 4. Update Price Comparison modal if open
+    const cmpModal = document.getElementById('modal-price-compare');
+    if (cmpModal && cmpModal.classList.contains('active')) {
+        const currentTitle = document.getElementById('price-compare-title');
+        if (currentTitle && currentTitle.textContent.toLowerCase().includes(brandName.toLowerCase())) {
+            openPriceComparisonModal(medId, brandName);
+        }
+    }
+
+    // 5. User Notification Toast & Bell Feed
+    const toastMsg = `${directionIcon} Market Price Alert: ${brandName} price updated to ৳${newPrice.toFixed(2)} (${pct}%) via ${source}`;
+    showToast(toastMsg);
+    addNotification({
+        icon: directionIcon,
+        title: `Market MRP: ${brandName}`,
+        text: `Official market price updated from ৳${oldPrice.toFixed(2)} to ৳${newPrice.toFixed(2)} (${pct}%). Source: ${source}.`,
+        time: 'Just now'
+    });
+
+    // 6. Refresh Admin Market subpanel tables if active
+    const marketSubpanel = document.getElementById('admin-subpanel-market');
+    if (marketSubpanel && (marketSubpanel.classList.contains('active') || marketSubpanel.style.display === 'block')) {
+        loadMarketPriceData();
+        loadMarketPriceHistory();
+    }
+}
+
+async function loadMarketPriceData() {
+    const tbody = document.getElementById('market-prices-tbody');
+    const countEl = document.getElementById('market-items-count');
+    const providerNameEl = document.getElementById('market-provider-name');
+    const syncTimeEl = document.getElementById('market-last-sync-time');
+
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/prices`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        if (providerNameEl && data.provider) {
+            providerNameEl.textContent = data.provider;
+        }
+        if (syncTimeEl) {
+            syncTimeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        const items = data.marketItems || [];
+        if (countEl) countEl.textContent = `${items.length} National Registry benchmark medicines`;
+
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No market data currently available.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+            const localMed = state.medicines ? state.medicines.find(m => m.brandName.toLowerCase() === item.brandName.toLowerCase()) : null;
+            const systemPrice = localMed ? `৳${localMed.unitPrice.toFixed(2)}` : '<span style="color:#94a3b8;">Not in catalog</span>';
+            const isSynced = localMed && Math.abs(localMed.unitPrice - item.mrp) < 0.01;
+            const statusBadge = isSynced 
+                ? '<span style="background:#ecfdf5; color:#059669; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600;">✓ SYNCHRONIZED</span>'
+                : (localMed 
+                    ? '<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600;">⚠️ PENDING SYNC</span>'
+                    : '<span style="background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:0.75rem;">UNTRACKED</span>');
+
+            return `
+                <tr>
+                    <td style="font-weight:600; color:var(--text-heading, #0f172a);">${escapeHtml(item.brandName)}</td>
+                    <td>${escapeHtml(item.genericName)}</td>
+                    <td>${escapeHtml(item.manufacturer || 'Top BD Pharma')}</td>
+                    <td>${escapeHtml(item.strength || '')} <small style="color:#64748b;">${escapeHtml(item.dosageForm || '')}</small></td>
+                    <td style="font-weight:700; color:#0284c7;">৳${item.mrp.toFixed(2)}</td>
+                    <td style="font-weight:700;">${systemPrice}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size:0.8rem; color:#64748b;">${new Date().toLocaleTimeString()}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Failed to load market prices:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#ef4444;">Failed to load live Bangladesh market data: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function loadMarketPriceHistory() {
+    const tbody = document.getElementById('market-history-tbody');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/history`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const history = data.history || [];
+
+        if (history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No price fluctuations logged yet. Run a sync or trigger a simulation.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = history.map(h => {
+            const isUp = h.newPrice > h.oldPrice;
+            const diff = h.newPrice - h.oldPrice;
+            const sign = diff >= 0 ? '+' : '';
+            const color = isUp ? '#ef4444' : '#10b981';
+            const icon = isUp ? '▲' : '▼';
+            const formattedTime = new Date(h.changedAt).toLocaleString();
+
+            return `
+                <tr>
+                    <td style="font-size:0.82rem; color:#64748b; font-family:var(--font-mono, monospace);">${formattedTime}</td>
+                    <td style="font-weight:600;">${escapeHtml(h.brandName)}</td>
+                    <td>৳${h.oldPrice.toFixed(2)}</td>
+                    <td style="font-weight:700; color:${color};">৳${h.newPrice.toFixed(2)}</td>
+                    <td style="font-weight:600; color:${color};">${icon} ${sign}৳${Math.abs(diff).toFixed(2)} (${sign}${h.percentChange.toFixed(1)}%)</td>
+                    <td><span style="background:var(--bg-card, #f8fafc); border:1px solid var(--border-color, #e2e8f0); padding:2px 8px; border-radius:4px; font-size:0.75rem;">${escapeHtml(h.source)}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Failed to load market history:', err);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#ef4444;">Failed to load audit history: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function syncMarketPricesNow() {
+    const badge = document.getElementById('market-sync-status-badge');
+    if (badge) {
+        badge.textContent = 'SYNCING NOW...';
+        badge.style.background = '#fef3c7';
+        badge.style.color = '#b45309';
+    }
+
+    showToast('🔄 Synchronizing MediLink medicine prices with Bangladesh Market API...');
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/sync`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast(`✓ Bangladesh Market Sync Complete: ${data.message || 'Prices up to date.'}`);
+            await loadMedicines();
+            await loadMarketPriceData();
+            await loadMarketPriceHistory();
+        } else {
+            showToast(`⚠️ Sync notice: ${data.message || 'Unknown response'}`);
+        }
+    } catch (err) {
+        console.error('Manual sync failed:', err);
+        showToast('❌ Sync failed: ' + err.message);
+    } finally {
+        if (badge) {
+            badge.textContent = 'AUTO-SYNC ACTIVE';
+            badge.style.background = '#ecfdf5';
+            badge.style.color = '#059669';
+        }
+    }
+}
+
+async function simulateMarketPriceFluctuation() {
+    const candidates = ['Napa Extra', 'Seclo', 'Monas', 'Sergel', 'Ace Plus', 'Ciprocin', 'Almex'];
+    const brand = candidates[Math.floor(Math.random() * candidates.length)];
+    const pctDeltas = [15.0, -10.0, 20.0, -12.5, 25.0, 8.5, -5.0];
+    const pct = pctDeltas[Math.floor(Math.random() * pctDeltas.length)];
+
+    showToast(`⚡ Simulating DGDA regulatory price revision for ${brand} (${pct > 0 ? '+' : ''}${pct}%)...`);
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/simulate-fluctuation?brandName=${encodeURIComponent(brand)}&percentChange=${pct}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`⚡ Simulated: ${data.message}`);
+            await loadMarketPriceData();
+            await loadMarketPriceHistory();
+        } else {
+            showToast(`Simulation notice: ${data.message || 'Error'}`);
+        }
+    } catch (err) {
+        console.error('Simulation failed:', err);
+        showToast('❌ Simulation failed: ' + err.message);
+    }
+}
 

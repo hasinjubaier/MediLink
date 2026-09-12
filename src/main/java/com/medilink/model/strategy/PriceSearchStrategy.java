@@ -19,7 +19,9 @@ public class PriceSearchStrategy implements MedicineSearchStrategy {
         } else {
             String q = query.trim().toLowerCase();
             for (Medicine m : allMedicines) {
-                if (m.getGenericName().toLowerCase().contains(q) || m.getBrandName().toLowerCase().contains(q)) {
+                boolean matchGeneric = m.getGenericName() != null && m.getGenericName().toLowerCase().contains(q);
+                boolean matchBrand = m.getBrandName() != null && m.getBrandName().toLowerCase().contains(q);
+                if (matchGeneric || matchBrand) {
                     matches.add(m);
                 }
             }

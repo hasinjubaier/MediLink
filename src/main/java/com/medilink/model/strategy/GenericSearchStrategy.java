@@ -17,7 +17,9 @@ public class GenericSearchStrategy implements MedicineSearchStrategy {
         }
         String q = query.trim().toLowerCase();
         for (Medicine m : allMedicines) {
-            if (m.getGenericName().toLowerCase().contains(q) || m.getCategory().toLowerCase().contains(q)) {
+            boolean matchGeneric = m.getGenericName() != null && m.getGenericName().toLowerCase().contains(q);
+            boolean matchCategory = m.getCategory() != null && m.getCategory().toLowerCase().contains(q);
+            if (matchGeneric || matchCategory) {
                 results.add(m);
             }
         }

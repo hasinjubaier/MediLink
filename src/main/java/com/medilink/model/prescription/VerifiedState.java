@@ -7,7 +7,7 @@ public class VerifiedState implements PrescriptionState {
 
     @Override
     public void next(Prescription context) {
-        // Terminal valid state
+        context.setState(new DispensedState());
     }
 
     @Override

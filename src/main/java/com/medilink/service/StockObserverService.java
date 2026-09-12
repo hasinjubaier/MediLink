@@ -56,6 +56,8 @@ public class StockObserverService implements Notifiable {
     }
 
     public List<String> getRecentEvents() {
-        return new ArrayList<>(recentStockEventLogs);
+        synchronized (recentStockEventLogs) {
+            return new ArrayList<>(recentStockEventLogs);
+        }
     }
 }

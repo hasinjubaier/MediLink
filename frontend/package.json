@@ -1,0 +1,22 @@
+{
+  "name": "medilink-frontend",
+  "version": "2.0.0",
+  "description": "MediLink 2.0 - Decoupled Healthcare & Pharmacy Ecosystem Web Client",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "serve": "npx serve . -l 3000"
+  },
+  "keywords": [
+    "healthcare",
+    "pharmacy",
+    "telemedicine",
+    "ocr",
+    "sse",
+    "gemini-ai",
+    "vanilla-js"
+  ],
+  "author": "Hasin Jubaier & MediLink Contributors",
+  "license": "MIT"
+}

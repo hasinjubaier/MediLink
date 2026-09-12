@@ -1,6 +1,7 @@
 package com.medilink.controller;
 
 import com.medilink.service.AiChatService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,7 +12,12 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class AiController {
 
-    private final AiChatService aiChatService = AiChatService.getInstance();
+    private final AiChatService aiChatService;
+
+    @Autowired
+    public AiController(AiChatService aiChatService) {
+        this.aiChatService = aiChatService;
+    }
 
     @PostMapping("/chat")
     public ResponseEntity<Map<String, Object>> processChat(@RequestBody Map<String, Object> body) {
