@@ -357,7 +357,7 @@ flowchart TD
 ### 8. System Administration, Governance & Telemetry (`/api/admin`)
 | Method | Endpoint | Description | Request Body / Query |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/admin/metrics` | Real-time JVM memory (heap MB), CPU cores, server uptime, DB status, and audit log | — |
+| `GET` | `/api/admin/telemetry` | Real-time JVM memory (heap MB), CPU cores, server uptime, DB status, and audit log | — |
 | `GET` | `/api/admin/users` | Retrieve complete user directory across all polymorphic roles | — |
 | `POST` | `/api/admin/users` | Administratively provision new user (`PATIENT`, `DOCTOR`, `PHARMACIST`, `ADMIN`) | `{"name": "...", "email": "...", "password": "...", "role": "PHARMACIST", ...}` |
 | `PUT` | `/api/admin/users/{id}` | Update existing user credentials, contact, and role attributes | `{"name": "...", "email": "...", "phone": "..."}` |
