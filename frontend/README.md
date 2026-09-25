@@ -18,15 +18,12 @@ The MediLink 2.0 frontend is an independent web application decoupled from the S
 
 ```
 frontend/
-├── config.js          # API Base URL & runtime environment config
-├── index.html         # Single Page Application layout & modals
-├── style.css          # Responsive design system & animations (~5,750 lines)
-├── app.js             # Core client state, controllers, OCR & SSE (~3,850 lines)
-├── server.js          # Zero-dependency Node.js HTTP server
+├── server.js          # Zero-dependency Node.js HTTP server (serves src/main/resources/static)
 ├── package.json       # Standard npm scripts
-├── flags/             # Country dial-code flag icons
+├── run.bat / run.ps1  # Standalone frontend launcher scripts
 └── README.md          # Frontend documentation
 ```
+Static web assets (HTML, CSS, JS, flags, and images) are centralized in `src/main/resources/static/`.
 
 ---
 
@@ -54,7 +51,7 @@ You can also serve this folder with any static web server of your choice:
 ## Backend API Configuration
 
 By default, the client is configured to connect to `http://localhost:8080`.
-To point to a different backend server or cloud deployment, simply edit `config.js`:
+To point to a different backend server or cloud deployment, simply edit `src/main/resources/static/config.js`:
 
 ```javascript
 window.MEDILINK_CONFIG = {

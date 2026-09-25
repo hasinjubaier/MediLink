@@ -636,18 +636,54 @@ function validatePasswordMatch() {
     }
 }
 
+let _isSubmittingAuth = false;
+
+function switchToSignInWithEmail(email) {
+    const signinEmail = document.getElementById('signin-email');
+    if (signinEmail && email) signinEmail.value = email;
+    setAuthMode('signin');
+    const signinPass = document.getElementById('signin-password');
+    if (signinPass) setTimeout(() => signinPass.focus(), 150);
+}
+
 async function handleAuthSubmit(event, formType) {
-    event.preventDefault();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    if (_isSubmittingAuth) return;
 
     if (formType === 'signin') {
-        const email = document.getElementById('signin-email').value.trim();
-        const password = document.getElementById('signin-password').value.trim();
+        const emailInput = document.getElementById('signin-email');
+        const passInput = document.getElementById('signin-password');
+        const email = emailInput?.value.trim() || '';
+        const password = passInput?.value.trim() || '';
+        const alertBox = document.getElementById('signin-alert-box');
+        const submitBtn = document.getElementById('btn-signin-submit');
+
+        if (alertBox) {
+            alertBox.style.display = 'none';
+            alertBox.innerHTML = '';
+        }
+
+        if (!email) {
+            showToast('⚠️ Please enter your login email.');
+            if (emailInput) emailInput.focus();
+            return;
+        }
 
         if (password.length < 6) {
             showToast('⚠️ Password must contain at least 6 characters.');
-            const passInput = document.getElementById('signin-password');
             if (passInput) passInput.focus();
             return;
+        }
+
+        _isSubmittingAuth = true;
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : 'Sign In';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Signing In...';
         }
 
         try {
@@ -676,7 +712,6 @@ async function handleAuthSubmit(event, formType) {
                 }
             } else if (data.code === 'USER_NOT_FOUND') {
                 // Email doesn't exist -> Show clear notification & guide to Sign Up
-                const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
                     alertBox.innerHTML = `
                         <span class="alert-icon" style="display:flex; align-items:center; color:#f59e0b;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></span>
@@ -701,7 +736,6 @@ async function handleAuthSubmit(event, formType) {
                 }, 1200);
 
             } else if (data.code === 'INVALID_PASSWORD') {
-                const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
                     alertBox.innerHTML = `
                         <span class="alert-icon" style="display:flex; align-items:center; color:#f59e0b;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></span>
@@ -714,7 +748,6 @@ async function handleAuthSubmit(event, formType) {
                 }
                 showToast('⚠️ Incorrect password! Click Forgot Password to reset.');
             } else {
-                const alertBox = document.getElementById('signin-alert-box');
                 if (alertBox) {
                     alertBox.innerHTML = `<span class="alert-icon" style="display:flex; align-items:center; color:#ef4444;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg></span><div>${data.message || 'Login failed. Check credentials.'}</div>`;
                     alertBox.style.display = 'flex';
@@ -723,32 +756,108 @@ async function handleAuthSubmit(event, formType) {
             }
         } catch (e) {
             showToast('Authentication server connection error.');
+        } finally {
+            _isSubmittingAuth = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
         }
 
     } else if (formType === 'signup') {
         syncSignupExtra();
-        const name = document.getElementById('signup-name').value.trim();
-        const email = document.getElementById('signup-email').value.trim();
-        const password = document.getElementById('signup-password').value.trim();
-        const confirmPassword = document.getElementById('signup-confirm-password')?.value.trim() || '';
-        const role = document.getElementById('signup-role').value;
-        const extra = document.getElementById('signup-extra').value.trim();
+        const nameInput = document.getElementById('signup-name');
+        const emailInput = document.getElementById('signup-email');
+        const passInput = document.getElementById('signup-password');
+        const confirmInput = document.getElementById('signup-confirm-password');
+        const roleInput = document.getElementById('signup-role');
+        const extraInput = document.getElementById('signup-extra');
+        const phoneInput = document.getElementById('signup-phone');
+        const extraTextInput = document.getElementById('signup-extra-text');
+        const alertBox = document.getElementById('signup-alert-box');
+        const submitBtn = document.getElementById('btn-signup-submit');
+
+        if (alertBox) {
+            alertBox.style.display = 'none';
+            alertBox.innerHTML = '';
+        }
+
+        const name = nameInput?.value.trim() || '';
+        const email = emailInput?.value.trim() || '';
+        const password = passInput?.value.trim() || '';
+        const confirmPassword = confirmInput?.value.trim() || '';
+        const role = roleInput?.value || 'PATIENT';
+        const extra = extraInput?.value.trim() || '';
+
+        const showSignupError = (msg, inputEl, isExistingEmail = false) => {
+            if (alertBox) {
+                if (isExistingEmail) {
+                    alertBox.innerHTML = `
+                        <span class="alert-icon" style="display:flex; align-items:center; color:#f59e0b;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></span>
+                        <div>
+                            <strong>Account already exists!</strong> <span style="color:#ffffff;">${email}</span> is already registered. 
+                            <a href="javascript:void(0)" onclick="switchToSignInWithEmail('${email}')" class="alert-link">Click here to Sign In ➔</a>
+                        </div>
+                    `;
+                } else {
+                    alertBox.innerHTML = `
+                        <span class="alert-icon" style="display:flex; align-items:center; color:#ef4444;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+                        <div>${msg}</div>
+                    `;
+                }
+                alertBox.style.display = 'flex';
+                const panel = document.querySelector('.form-signup');
+                if (panel) panel.scrollTop = 0;
+            }
+            showToast('⚠️ ' + msg);
+            if (inputEl) {
+                inputEl.focus();
+                inputEl.style.borderColor = '#ef4444';
+                setTimeout(() => { if (inputEl) inputEl.style.borderColor = ''; }, 3000);
+            }
+        };
+
+        // Comprehensive Field Validations
+        if (!name) {
+            showSignupError('Please enter your full name.', nameInput);
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+            showSignupError('Please enter a valid email address (e.g. name@example.com).', emailInput);
+            return;
+        }
+
+        if (role === 'PATIENT') {
+            const rawPhone = phoneInput?.value.trim() || '';
+            if (!rawPhone) {
+                showSignupError('Please enter your emergency contact phone number.', phoneInput);
+                return;
+            }
+        } else if (role === 'PHARMACIST') {
+            const rawText = extraTextInput?.value.trim() || '';
+            if (!rawText) {
+                showSignupError('Please enter your Pharmacy Name and License Number.', extraTextInput);
+                return;
+            }
+        }
 
         if (password.length < 6) {
-            showToast('⚠️ Password must contain at least 6 characters.');
-            const passInput = document.getElementById('signup-password');
-            if (passInput) passInput.focus();
+            showSignupError('Password must contain at least 6 characters.', passInput);
             return;
         }
 
         if (password !== confirmPassword) {
-            showToast('⚠️ Passwords do not match! Please check and confirm your password.');
-            const confirmInput = document.getElementById('signup-confirm-password');
-            if (confirmInput) {
-                confirmInput.focus();
-                confirmInput.style.borderColor = '#ef4444';
-            }
+            showSignupError('Passwords do not match! Please verify your password.', confirmInput);
             return;
+        }
+
+        _isSubmittingAuth = true;
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : 'Sign Up';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Creating Account...';
         }
 
         try {
@@ -767,19 +876,58 @@ async function handleAuthSubmit(event, formType) {
 
             if (data.status === 'SUCCESS') {
                 localStorage.setItem('medilink_has_registered', 'true');
-                // Step 1 Completed (Sign Up): Now pre-fill and slide to Step 2 (Sign In)
-                document.getElementById('signin-email').value = email;
-                document.getElementById('signin-password').value = password;
-                selectAuthRole(role, 'signin');
+                showToast(`🎉 Account created! Logging in as ${name}...`);
 
-                // Smoothly slide to Sign In panel
+                // Auto-login to obtain full authenticated session & open dashboard
+                try {
+                    const loginRes = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email, password: password })
+                    });
+                    const loginData = await loginRes.json();
+
+                    if (loginData.status === 'SUCCESS') {
+                        applyAuthenticatedUser(loginData, true);
+                        closeModal('modal-auth');
+                        showToast(`🎉 Welcome to MediLink, ${loginData.name}!`);
+
+                        if (loginData.role === 'PATIENT') {
+                            launchApp('patient');
+                        } else if (loginData.role === 'PHARMACIST') {
+                            launchApp('pharmacist');
+                        } else if (loginData.role === 'ADMIN') {
+                            launchApp('admin');
+                        } else {
+                            launchApp('dashboard');
+                        }
+                        return;
+                    }
+                } catch (autoLoginErr) {
+                    console.warn('Auto-login network error, falling back to sign-in panel', autoLoginErr);
+                }
+
+                // Smoothly slide to Sign In panel if auto-login wasn't completed
+                const signinEmail = document.getElementById('signin-email');
+                const signinPassword = document.getElementById('signin-password');
+                if (signinEmail) signinEmail.value = email;
+                if (signinPassword) signinPassword.value = password;
+                selectAuthRole(role, 'signin');
                 setAuthMode('signin');
-                showToast(`✅ Account created for ${name}! Please click 'Sign In' to enter.`);
+                showToast(`✅ Account created for ${name}! Click 'Sign In' to enter.`);
             } else {
-                showToast(data.message || 'Registration failed.');
+                const isExisting = (data.message || '').toLowerCase().includes('already exists') ||
+                                   (data.message || '').toLowerCase().includes('already registered');
+                showSignupError(data.message || 'Registration failed.', isExisting ? emailInput : null, isExisting);
             }
         } catch (e) {
-            showToast('Registration failed. Try again.');
+            showSignupError('Registration server error. Please ensure the backend is running.', null);
+        } finally {
+            _isSubmittingAuth = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
         }
     }
 }
@@ -796,6 +944,8 @@ const FEMALE_INDICATORS = [
     'tahsin', 'umme', 'zarin', 'zeba', 'zohra', 'mou', 'mim', 'mitu', 'mithila', 'meherin',
     'mrs', 'ms', 'miss', 'lady', 'female', 'woman', 'girl'
 ];
+
+const ADMIN_DEFAULT_AVATAR = 'assets/images/admin_avatar.png';
 
 const MALE_PHOTOS = [
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80',
@@ -823,18 +973,27 @@ function detectGender(name = '', genderExplicit = '') {
 }
 
 function getUserAvatarAssets(name = '', gender = '', role = 'PATIENT') {
+    const roleUpper = (role || '').toUpperCase();
+    if (roleUpper === 'ADMIN') {
+        return {
+            gender: 'MALE',
+            emoji: '🛡️',
+            photo: ADMIN_DEFAULT_AVATAR,
+            photosList: [ADMIN_DEFAULT_AVATAR]
+        };
+    }
     const detected = detectGender(name, gender);
     if (detected === 'FEMALE') {
         return {
             gender: 'FEMALE',
-            emoji: role === 'PHARMACIST' ? '👩‍⚕️' : '👩',
+            emoji: roleUpper === 'PHARMACIST' ? '👩‍⚕️' : '👩',
             photo: FEMALE_PHOTOS[0],
             photosList: FEMALE_PHOTOS
         };
     } else {
         return {
             gender: 'MALE',
-            emoji: role === 'PHARMACIST' ? '👨‍⚕️' : '👨',
+            emoji: roleUpper === 'PHARMACIST' ? '👨‍⚕️' : '👨',
             photo: MALE_PHOTOS[0],
             photosList: MALE_PHOTOS
         };
@@ -5604,6 +5763,7 @@ function renderAdminUsersTable(users) {
         const role = (u.role || 'PATIENT').toUpperCase();
         let roleBadgeClass = 'badge-patient';
         let roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        let avatarSrc = u.customAvatar || (role === 'ADMIN' ? ADMIN_DEFAULT_AVATAR : '');
         if (role === 'PHARMACIST') {
             roleBadgeClass = 'badge-pharmacist';
             roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>`;
@@ -5620,7 +5780,11 @@ function renderAdminUsersTable(users) {
                 <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(u.id || '')}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="display:flex; align-items:center; color:var(--primary-blue);">${roleSvg}</span>
+                        ${avatarSrc ? `
+                            <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(u.name || 'User')}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid ${role === 'ADMIN' ? '#f59e0b' : 'var(--primary-blue, #29a3b8)'}; flex-shrink:0;">
+                        ` : `
+                            <span style="display:flex; align-items:center; color:var(--primary-blue);">${roleSvg}</span>
+                        `}
                         <div>
                             <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(u.name || 'Unnamed')}</strong>
                             <small style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(u.email || '')}</small>
@@ -5633,7 +5797,7 @@ function renderAdminUsersTable(users) {
                     <small style="color:var(--text-muted);">${escapeHtml(address)}</small>
                 </td>
                 <td>
-                    <span style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:2px 6px; border-radius:4px;">
+                    <span class="admin-cred-badge">
                         ${role === 'PHARMACIST' && u.licenseNumber ? `Lic: ${escapeHtml(u.licenseNumber)}` : 'Active / Hash Protected'}
                     </span>
                 </td>
@@ -6349,7 +6513,7 @@ function renderAdminPrescriptionsTable(rxList) {
                 <td>${statusBadge}</td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <select onchange="adminUpdateRxStatus('${rx.id}', this.value)" style="padding:4px 8px; font-size:0.78rem; border-radius:6px; border:1px solid #cbd5e1; background:var(--bg-color); font-weight:600;">
+                        <select class="admin-rx-status-select" onchange="adminUpdateRxStatus('${rx.id}', this.value)">
                             <option value="">-- Change State --</option>
                             <option value="VERIFIED" ${status === 'VERIFIED' ? 'selected' : ''}>Verify Genuine</option>
                             <option value="DISPENSED" ${status === 'DISPENSED' ? 'selected' : ''}>Mark Dispensed</option>

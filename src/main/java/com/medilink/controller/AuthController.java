@@ -89,6 +89,10 @@ public class AuthController {
             resp.put("status", "SUCCESS");
             resp.put("message", "Registered successfully as " + role);
             resp.put("id", newUser.getId());
+            resp.put("name", newUser.getName());
+            resp.put("email", newUser.getEmail());
+            resp.put("role", newUser.getRole().name());
+            resp.put("phone", newUser.getPhone() != null ? newUser.getPhone() : "");
             return ResponseEntity.ok(resp);
         } catch (Exception e) {
             Map<String, Object> resp = new HashMap<>();

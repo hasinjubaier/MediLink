@@ -89,6 +89,7 @@ public class UserFactory {
                     } catch (NumberFormatException ignored) {}
                 }
                 Admin admin = new Admin(id, name, email, passwordHash, accessLevel);
+                admin.setCustomAvatar("assets/images/admin_avatar.png");
                 if (extraData != null && extraData.containsKey("phone")) {
                     admin.setPhone(extraData.get("phone"));
                 }

@@ -8,6 +8,8 @@ import com.medilink.repository.MedicinePriceHistoryRepository;
 import com.medilink.repository.MedicineRepository;
 import com.medilink.repository.PharmacyStockRepository;
 import com.medilink.service.StockObserverService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import java.util.*;
  */
 @Service
 public class MarketPriceSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(MarketPriceSyncService.class);
 
     private final MedicineRepository medicineRepository;
     private final PharmacyStockRepository pharmacyStockRepository;
@@ -45,9 +49,9 @@ public class MarketPriceSyncService {
      */
     @Scheduled(fixedDelay = 300000, initialDelay = 15000)
     public void scheduledMarketSync() {
-        System.out.println("[MarketPriceSyncService] Starting scheduled BD market price synchronization...");
+        log.info("[MarketPriceSyncService] Starting scheduled BD market price synchronization...");
         SyncResult result = syncAllMedicines("Scheduled Auto-Sync (Cron)");
-        System.out.println("[MarketPriceSyncService] Scheduled sync completed: " + result.getUpdatedCount() + " price(s) updated.");
+        log.info("[MarketPriceSyncService] Scheduled sync completed: " + result.getUpdatedCount() + " price(s) updated.");
     }
 
     /**
@@ -207,7 +211,7 @@ public class MarketPriceSyncService {
 
         // Notify client stream over SSE
         StockObserverService.getInstance().onNotification("PRICE_UPDATE", payload);
-        System.out.println("[MarketPriceSyncService] Real-time Price Update Broadcasted: " + med.getBrandName() +
+        log.info("[MarketPriceSyncService] Real-time Price Update Broadcasted: " + med.getBrandName() +
                 " " + oldPrice + " -> " + newPrice + " BDT (" + sign + pct + "%)");
     }
 

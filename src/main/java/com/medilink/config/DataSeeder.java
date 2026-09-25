@@ -9,6 +9,8 @@ import com.medilink.model.prescription.PrescriptionItem;
 import com.medilink.model.reminder.Reminder;
 import com.medilink.model.user.*;
 import com.medilink.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,8 @@ import java.util.*;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final UserRepository userRepository;
     private final PatientRepository patientRepository;
@@ -84,7 +88,7 @@ public class DataSeeder implements CommandLineRunner {
             Admin admin = (Admin) UserFactory.createUserWithId("usr_admin_01", UserRole.ADMIN, "System Administrator", "admin@medilink.com", "admin123", admData);
             adminRepository.save(admin);
 
-            System.out.println("[DataSeeder] Seeded default polymorphic users (Patient, Pharmacist, Admin).");
+            log.info("[DataSeeder] Seeded default polymorphic users (Patient, Pharmacist, Admin).");
         }
     }
 
@@ -105,7 +109,7 @@ public class DataSeeder implements CommandLineRunner {
             addMed("med_13", "Odmon 10", "Montelukast", "Square Pharmaceuticals", "10mg", "Tablet", 17.50, false, "Respiratory / Anti-Asthma", "Sleep disturbances", Arrays.asList("SQR-ODM-331"));
             addMed("med_14", "Fexo 120", "Fexofenadine", "Square Pharmaceuticals", "120mg", "Tablet", 9.00, false, "Antihistamine", "Drowsiness (rare)", Arrays.asList("SQR-FEX-121"));
 
-            System.out.println("[DataSeeder] Seeded 14 default medicines with authentic DGDA batch codes.");
+            log.info("[DataSeeder] Seeded 14 default medicines with authentic DGDA batch codes.");
         } else {
             ensureBatchData();
         }
@@ -159,7 +163,7 @@ public class DataSeeder implements CommandLineRunner {
             pharmacyRepository.save(new Pharmacy("pharma_04", "Popular Pharmacy (Gulshan)", "Gulshan 1 Circle, Dhaka", "Gulshan", "+8801744556677", 23.7786, 90.4162, true, true));
             pharmacyRepository.save(new Pharmacy("pharma_05", "Care & Cure Pharmacy (Uttara)", "Sector 3, Uttara, Dhaka", "Uttara", "+8801755667788", 23.8728, 90.3980, true, true));
 
-            System.out.println("[DataSeeder] Seeded 5 Dhaka pharmacies.");
+            log.info("[DataSeeder] Seeded 5 Dhaka pharmacies.");
         }
     }
 
@@ -191,7 +195,7 @@ public class DataSeeder implements CommandLineRunner {
             pharmacyStockRepository.save(new PharmacyStock("stk_09", "pharma_04", "Popular Pharmacy (Gulshan)", "med_12", "Monas 10", "Montelukast", 55, 18.00));
             pharmacyStockRepository.save(new PharmacyStock("stk_21", "pharma_01", "Lazz Pharma (Dhanmondi)", "med_12", "Monas 10", "Montelukast", 40, 17.50));
 
-            System.out.println("[DataSeeder] Seeded 21 cross-pharmacy stock records.");
+            log.info("[DataSeeder] Seeded 21 cross-pharmacy stock records.");
         }
     }
 
@@ -207,7 +211,7 @@ public class DataSeeder implements CommandLineRunner {
             rx1.setVerifiedByPharmacistId("usr_pharma_01");
             prescriptionRepository.save(rx1);
 
-            System.out.println("[DataSeeder] Seeded verified prescription rx_101.");
+            log.info("[DataSeeder] Seeded verified prescription rx_101.");
         }
     }
 
@@ -256,7 +260,7 @@ public class DataSeeder implements CommandLineRunner {
             n2.setIsRead(true);
             chatMessageRepository.save(n2);
 
-            System.out.println("[DataSeeder] Seeded rich initial chat messages for multiple pharmacists.");
+            log.info("[DataSeeder] Seeded rich initial chat messages for multiple pharmacists.");
         }
     }
 
@@ -265,7 +269,7 @@ public class DataSeeder implements CommandLineRunner {
             reminderRepository.save(new Reminder("rem_01", "ML-9824-A", "rahim@medilink.com", "Seclo 20", "1 Capsule (20mg)", "07:30", "DAILY", "Take 30 mins before breakfast"));
             reminderRepository.save(new Reminder("rem_02", "ML-9824-A", "rahim@medilink.com", "Napa Extra", "1 Tablet", "14:00", "DAILY", "Take with water after lunch if fever persists"));
 
-            System.out.println("[DataSeeder] Seeded initial active reminders.");
+            log.info("[DataSeeder] Seeded initial active reminders.");
         }
     }
 }

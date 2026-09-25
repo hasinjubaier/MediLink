@@ -45,9 +45,9 @@ switch ($choice) {
     Default {
         Write-Host "Launching MediLink 2.0 Fullstack Application..." -ForegroundColor Green
         Write-Host "Starting Backend API in separate window..." -ForegroundColor Cyan
-        Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "$PSScriptRoot\run-backend.ps1"
+        Start-Process cmd -ArgumentList "/k", "title MediLink 2.0 Backend && set ""PATH=C:\Users\Hasin\AppData\Local\Programs\apache-maven-3.8.8\bin;%PATH%"" && set DB_PASSWORD=$env:DB_PASSWORD && mvn spring-boot:run" -WorkingDirectory $PSScriptRoot
         
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 3
         
         Write-Host "Starting Frontend Client on http://localhost:3000 ..." -ForegroundColor Cyan
         Push-Location "$PSScriptRoot\frontend"

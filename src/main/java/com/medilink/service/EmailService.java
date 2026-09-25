@@ -1,5 +1,8 @@
 package com.medilink.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.mail.*;
 import javax.mail.internet.*;
 import java.util.Properties;
@@ -17,6 +20,8 @@ import java.util.Properties;
  * └─────────────────────────────────────────────────────────┘
  */
 public class EmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     // ── FALLBACK CREDENTIALS ──────────────────────────────────
     private static final String SENDER_EMAIL       = "your_gmail@gmail.com";
@@ -122,7 +127,7 @@ public class EmailService {
         message.setContent(buildHtmlBody(otp), "text/html; charset=UTF-8");
 
         Transport.send(message);
-        System.out.println("[EmailService] Real OTP email successfully delivered via Gmail SMTP to: " + toEmail);
+        log.info("[EmailService] Real OTP email successfully delivered via Gmail SMTP to: " + toEmail);
     }
 
     /** Checks whether email credentials have been configured. */

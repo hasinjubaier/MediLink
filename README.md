@@ -415,37 +415,88 @@ MediLink 2.0 uses **PostgreSQL**. Tables are defined in [`medilink_schema.sql`](
 
 ---
 
-### Running the Decoupled Application
+### Running the Application
 
-MediLink 2.0 features a completely separated client-server architecture:
-- **Backend REST API**: Runs on Spring Boot at `http://localhost:8080`
-- **Frontend SPA Client**: Runs independently on Node.js / any static server at `http://localhost:3000`
+MediLink 2.0 can be executed using the consolidated orchestrator scripts or manually via separate terminals.
 
-#### Option 1: Fullstack Parallel Runner (PowerShell)
+#### Method 1: Using Consolidated Launcher Scripts (Recommended)
+
+##### Option A: PowerShell Orchestrator
 ```powershell
 .\run.ps1
 ```
-*Provides an interactive menu to launch both Backend and Frontend in parallel, or choose an individual component.*
+*Launches an interactive prompt to select:*
+- `[1]` **Fullstack Application**: Starts the Backend in a separate window and Frontend in current terminal.
+- `[2]` **Backend REST API Only** (`:8080`).
+- `[3]` **Frontend Web Client Only** (`:3000`).
 
-#### Option 2: Fullstack Batch Script (Windows CMD)
-```cmd
-build_and_run.bat
+You can also bypass the menu by specifying the mode parameter:
+```powershell
+.\run.ps1 -Mode 1   # Fullstack (Backend :8080 + Frontend :3000)
+.\run.ps1 -Mode 2   # Backend REST API Only (:8080)
+.\run.ps1 -Mode 3   # Frontend Web Client Only (:3000)
 ```
 
-#### Option 3: Running Backend & Frontend Individually
-- **Backend REST API (:8080)**:
-  ```powershell
-  .\run-backend.ps1
-  # OR: mvn spring-boot:run
-  ```
-- **Frontend Web Client (:3000)**:
-  ```powershell
-  .\run-frontend.ps1
-  # OR: cd frontend && npm start
-  ```
+##### Option B: Command Prompt / Batch Wrapper
+```cmd
+run.bat
+```
+*A lightweight Windows batch wrapper that forwards all commands to `run.ps1` (e.g. `run.bat` or `run.bat -Mode 1`).*
+
+---
+
+#### Method 2: Running Manually in Separate Terminals (Step-by-Step)
+
+If you prefer to start each service manually without wrapper scripts:
+
+##### Step 1: Ensure PostgreSQL Database is Running
+Make sure PostgreSQL is active on port `5433` (or `5432`) with the database `medilink_db` created.
+
+##### Step 2: Terminal 1 — Start Spring Boot Backend REST API (`:8080`)
+Open a terminal at the project root:
+
+**In PowerShell:**
+```powershell
+$env:DB_PASSWORD = "Jubaier2@"
+mvn spring-boot:run
+```
+*Or run the pre-built jar directly:*
+```powershell
+$env:DB_PASSWORD = "Jubaier2@"
+java -jar target\medilink-2.0.0.jar
+```
+
+**In Command Prompt (CMD):**
+```cmd
+set DB_PASSWORD=Jubaier2@
+mvn spring-boot:run
+```
+
+##### Step 3: Terminal 2 — Start Standalone Frontend Dev Server (`:3000`)
+Open a second terminal at the project root:
+
+**In PowerShell or CMD:**
+```powershell
+cd frontend
+node server.js
+```
+*The dev server serves static files directly from `src/main/resources/static/` at `http://localhost:3000` and automatically reverse-proxies `/api/*` requests to `http://localhost:8080`.*
+
+---
+
+#### Method 3: Backend-Only Single-Origin Mode (`:8080`)
+
+Because all web assets are bundled inside `src/main/resources/static/`, Spring Boot serves the frontend SPA directly alongside the REST API:
+```powershell
+$env:DB_PASSWORD = "Jubaier2@"
+mvn spring-boot:run
+```
+Then navigate directly to **[http://localhost:8080](http://localhost:8080)** in any web browser.
+
+---
 
 #### Connecting to Custom API URLs
-To change the target API host or port, update `frontend/config.js`:
+To point the frontend to a different backend host or port, update `src/main/resources/static/config.js`:
 ```javascript
 window.MEDILINK_CONFIG = {
     API_BASE_URL: 'http://localhost:8080'
@@ -473,19 +524,13 @@ d:\ACADEMIC CAREER\12th Semester\Advance OOP\Medilink2.0
 ├── pom.xml                                   # Maven dependencies & build configuration
 ├── database/                                 # Database scripts & schema DDL
 ├── run.ps1                                   # Interactive Fullstack PowerShell orchestrator
-├── build_and_run.bat                         # Interactive Batch runner
-├── run-backend.bat / run-backend.ps1         # Standalone Spring Boot Backend launchers (:8080)
-├── run-frontend.bat / run-frontend.ps1       # Standalone Frontend Client launchers (:3000)
+├── run.bat                                   # Batch wrapper delegating to run.ps1
 ├── README.md                                 # Complete system documentation
 │
-├── frontend/                                 # 🌐 Standalone Frontend Web Application
-│   ├── config.js                             # API Base URL & client runtime configuration
-│   ├── index.html                            # Unified Single Page Application UI
-│   ├── style.css                             # Glassmorphic responsive styling (~9,500 lines)
-│   ├── app.js                                # Core frontend controllers, OCR & SSE client (~6,460 lines)
+├── frontend/                                 # 🌐 Standalone Frontend Server & Launcher
 │   ├── server.js                             # Zero-dependency Node.js HTTP server (:3000)
 │   ├── package.json                          # Standard npm scripts (start, dev, serve)
-│   ├── flags/                                # SVG national flags for country dial picker
+│   ├── run.bat / run.ps1                     # Standalone frontend launchers
 │   └── README.md                             # Frontend documentation & API guide
 │
 └── src/                                      # ☕ Spring Boot Headless REST Backend
@@ -513,7 +558,14 @@ d:\ACADEMIC CAREER\12th Semester\Advance OOP\Medilink2.0
     │   │   └── service/                      # Business logic services & Singletons
     │   └── resources/
     │       ├── application.properties        # Application & database properties
-    │       └── static/                       # Bundled static resources (synced fallback)
+    │       └── static/                       # Web static assets (Single Source of Truth)
+    │           ├── index.html                # Unified Single Page Application UI
+    │           ├── style.css                 # Glassmorphic responsive styling
+    │           ├── app.js                    # Core frontend controllers, OCR & SSE client
+    │           ├── config.js                 # API Base URL & client runtime configuration
+    │           ├── forgot-password.html      # Self-service OTP password reset
+    │           ├── flags/                    # Country flag icons
+    │           └── assets/images/            # Platform & testimonial imagery
     └── test/                                 # Automated test suite
 ```
 
@@ -525,6 +577,14 @@ d:\ACADEMIC CAREER\12th Semester\Advance OOP\Medilink2.0
 ```powershell
 mvn test
 ```
+
+### Running the Application for Verification
+To start the services before running manual checks, refer to [Running the Application](#running-the-application):
+- **Automated Launcher**: Run `.\run.ps1` in PowerShell or `run.bat` in CMD.
+- **Manual Dual-Terminal**:
+  - *Terminal 1 (Backend)*: `$env:DB_PASSWORD = "Jubaier2@"; mvn spring-boot:run` (runs on `:8080`)
+  - *Terminal 2 (Frontend)*: `cd frontend; node server.js` (runs on `:3000`)
+- **Direct Single-Origin**: Run backend and browse to [http://localhost:8080](http://localhost:8080).
 
 ### Manual Verification Checklist
 1. **Authentication Flow**:

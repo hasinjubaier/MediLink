@@ -2,6 +2,8 @@ package com.medilink.service;
 
 import com.medilink.model.user.*;
 import com.medilink.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 @Transactional
 public class UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
     private final PatientRepository patientRepository;
@@ -79,8 +83,11 @@ public class UserService {
     }
 
     public User registerUser(UserRole role, String name, String email, String password, Map<String, String> extra) {
-        if (email == null || userRepository.existsByEmailIgnoreCase(email.trim())) {
-            throw new IllegalArgumentException("User with email " + email + " already exists.");
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email address is required.");
+        }
+        if (userRepository.existsByEmailIgnoreCase(email.trim())) {
+            throw new IllegalArgumentException("User with email " + email.trim() + " already exists.");
         }
 
         User newUser = UserFactory.createUser(role, name, email.trim().toLowerCase(), password, extra);
@@ -129,12 +136,12 @@ public class UserService {
                 liveSent = true;
                 message = "Live verification code sent to " + cleanEmail;
             } catch (Exception e) {
-                System.err.println("[UserService] Failed to send live email via SMTP: " + e.getMessage());
+                log.warn("[UserService] Failed to send live email via SMTP: {}", e.getMessage());
                 message = "SMTP delivery error (" + e.getMessage() + "). Demo code generated for testing.";
             }
         } else {
             message = "Live Gmail SMTP not configured in medilink_config.properties. Demo code generated for testing.";
-            System.out.println("[UserService] Live Gmail SMTP not configured. Simulating OTP code: " + code);
+            log.debug("[UserService] Live Gmail SMTP not configured. Simulating OTP code: {}", code);
         }
 
         return new OtpDispatchResult(code, liveSent, message);
