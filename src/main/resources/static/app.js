@@ -2681,6 +2681,91 @@ async function loadPrescriptions() {
     }
 }
 
+function formatMedicineTakenTimeDisplay(item) {
+    if (!item) return 'As clinically directed';
+    let t = item.takenTime || '';
+    if (t && t.toLowerCase().includes('uncertain')) t = '';
+    let instr = item.instructions || '';
+    if (instr && instr.toLowerCase().includes('uncertain')) instr = '';
+    let freq = item.frequency || '';
+    if (freq && freq.toLowerCase().includes('uncertain')) freq = '';
+
+    if (!t && instr) {
+        if (instr.includes('Taken Time:')) {
+            const part = instr.split('Taken Time:')[1].split('|')[0].trim();
+            if (part && !part.toLowerCase().includes('uncertain')) t = part;
+        } else if (instr.includes('Time:')) {
+            const part = instr.split('Time:')[1].split('|')[0].trim();
+            if (part && !part.toLowerCase().includes('uncertain')) t = part;
+        }
+    }
+
+    if (!t && freq) {
+        if (freq.includes('1+1+1') || freq.toLowerCase().includes('3 times') || freq.toLowerCase() === 'tid') {
+            t = 'Morning, Afternoon & Night';
+        } else if (freq.includes('1+0+1') || freq.toLowerCase().includes('2 times') || freq.toLowerCase() === 'bd' || freq.toLowerCase() === 'bid') {
+            t = 'Morning & Night';
+        } else if (freq.includes('1+0+0') || freq.toLowerCase().includes('morning')) {
+            t = 'Morning (Breakfast)';
+        } else if (freq.includes('0+1+0') || freq.toLowerCase().includes('afternoon')) {
+            t = 'Afternoon (Lunch)';
+        } else if (freq.includes('0+0+1') || freq.toLowerCase().includes('night') || freq.toLowerCase() === 'hs') {
+            t = 'Night (Bedtime)';
+        } else if (freq.toLowerCase().includes('stat')) {
+            t = 'Immediately (Stat Dose)';
+        } else if (freq.toLowerCase().includes('once daily') || freq.toLowerCase() === 'od') {
+            t = 'Once Daily';
+        } else if (freq.toLowerCase().includes('sos') || freq.toLowerCase().includes('needed')) {
+            t = 'As Needed (SOS)';
+        }
+    }
+
+    if (!t && instr) {
+        const lowNotes = instr.toLowerCase();
+        if (lowNotes.includes('empty stomach') || lowNotes.includes('breakfast') || lowNotes.includes('morning')) {
+            t = 'Morning';
+        } else if (lowNotes.includes('lunch') || lowNotes.includes('afternoon')) {
+            t = 'Afternoon';
+        } else if (lowNotes.includes('dinner') || lowNotes.includes('bedtime') || lowNotes.includes('night')) {
+            t = 'Night';
+        } else if (lowNotes.includes('after meal') || lowNotes.includes('after food')) {
+            t = 'After Meals';
+        } else if (lowNotes.includes('before meal') || lowNotes.includes('before food')) {
+            t = 'Before Meals';
+        }
+    }
+
+    return t || 'As clinically prescribed';
+}
+
+function extractMealRelation(item) {
+    if (!item) return '';
+    if (item.mealRelation) return item.mealRelation;
+    const text = `${item.instructions || ''} ${item.frequency || ''}`.toLowerCase();
+    if (text.includes('before meal') || text.includes('before breakfast') || text.includes('empty stomach') || text.includes('ac')) {
+        return 'Before meal';
+    }
+    if (text.includes('after meal') || text.includes('after food') || text.includes('pc')) {
+        return 'After meal';
+    }
+    if (text.includes('with meal') || text.includes('with food')) {
+        return 'With meal';
+    }
+    return '';
+}
+
+function extractClinicalNotes(instructions) {
+    if (!instructions) return '';
+    let note = instructions;
+    note = note.replace(/Taken Time:[^|]*/gi, '');
+    note = note.replace(/Time:[^|]*/gi, '');
+    note = note.replace(/Clock:[^|]*/gi, '');
+    note = note.replace(/Meal:[^|]*/gi, '');
+    note = note.replace(/Note:\s*/gi, '');
+    note = note.replace(/^[|\s]+|[|\s]+$/g, '');
+    return note.trim();
+}
+
 function renderPrescriptions(list) {
     const rxCount = list ? list.length : 0;
     const rxCountEl = document.getElementById('dash-rx-count');
@@ -2700,8 +2785,8 @@ function renderPrescriptions(list) {
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <div>
-                    <h3>Prescription #${rx.id} — Patient: ${rx.patientName}</h3>
-                    <p class="text-muted">Prescribed by <strong>${rx.doctorName}</strong> (${rx.hospital})</p>
+                    <h3>Prescription #${rx.id} — Patient: ${escapeHtml(rx.patientName || (state.currentUser ? state.currentUser.name : 'Patient'))}</h3>
+                    <p class="text-muted">Prescribed by <strong>${escapeHtml(rx.doctorName || 'Consulting Physician')}</strong> (${escapeHtml(rx.hospital || 'Hospital / Clinic')})</p>
                 </div>
                 <span class="status-pill status-${rx.status.toLowerCase().includes('verified') ? 'verified' : rx.status.toLowerCase().includes('extracted') ? 'extracted' : 'uploaded'}">
                     ${rx.status}
@@ -2736,23 +2821,53 @@ function renderPrescriptions(list) {
                 <audio controls src="${rx.voiceNoteAudio}" style="height: 32px; flex:1; min-width:220px;"></audio>
             </div>` : ''}
 
-            <h4>Extracted Dosage Items:</h4>
-            <div class="rx-dosage-grid">
-                ${rx.items.map(item => `
-                    <div class="rx-dosage-item-card">
-                        <strong class="rx-dosage-title">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rx-dosage-pill-svg">
-                                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
-                                <path d="m8.5 8.5 7 7"/>
-                            </svg>
-                            <span>${escapeHtml(item.medicineName)}</span>
-                        </strong> (${escapeHtml(item.dosage)})<br>
-                        <small class="text-muted">Freq: ${escapeHtml(item.frequency)} | ${escapeHtml(item.instructions)}</small>
+            <h4 style="margin: 14px 0 8px; font-weight: 800; color: var(--text-heading);">Prescribed Medications & Intake Schedule:</h4>
+            <div class="rx-medications-sections-list">
+                ${rx.items && rx.items.length > 0 ? rx.items.map((item, idx) => {
+                    const takenTimeDisplay = formatMedicineTakenTimeDisplay(item);
+                    const mealRelation = extractMealRelation(item);
+                    const cleanNote = extractClinicalNotes(item.instructions);
+                    return `
+                    <div class="rx-history-med-card">
+                        <div class="rx-history-med-header">
+                            <div class="rx-med-name-wrap">
+                                <span class="rx-med-number">${idx + 1}</span>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rx-dosage-pill-svg">
+                                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                                    <path d="m8.5 8.5 7 7"/>
+                                </svg>
+                                <strong class="rx-history-med-name">${escapeHtml(item.medicineName || 'Medication')}</strong>
+                                ${item.dosage ? `<span class="rx-history-dosage-pill">${escapeHtml(item.dosage)}</span>` : ''}
+                                ${item.genericName ? `<span class="rx-history-generic">(${escapeHtml(item.genericName)})</span>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Dedicated Medicine Taken Time Section -->
+                        <div class="rx-taken-time-banner">
+                            <div class="rx-taken-time-heading">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span>Medicine Taken Time:</span>
+                            </div>
+                            <div class="rx-taken-time-details">
+                                <span class="rx-time-badge">⏰ ${escapeHtml(takenTimeDisplay)}</span>
+                                ${item.frequency ? `<span class="rx-freq-chip">🔄 ${escapeHtml(item.frequency)}</span>` : ''}
+                                ${mealRelation ? `<span class="rx-meal-chip">🍽️ ${escapeHtml(mealRelation)}</span>` : ''}
+                                ${item.duration ? `<span class="rx-dur-chip">⏳ ${escapeHtml(item.duration)}</span>` : ''}
+                            </div>
+                        </div>
+
+                        ${cleanNote ? `
+                        <div class="rx-med-note-block">
+                            <strong>Note:</strong> ${escapeHtml(cleanNote)}
+                        </div>` : ''}
                     </div>
-                `).join('')}
+                    `;
+                }).join('') : '<p class="text-muted" style="font-size:0.86rem; padding:8px 0;">No individual dosage items extracted.</p>'}
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 14px;">
                 <div>
                     ${!rx.isDispenseReady ? `
                         <button class="btn btn-primary" onclick="advancePrescriptionState('${rx.id}')">
@@ -4826,6 +4941,8 @@ function handleRxDragLeave(e) {
     if (dropzone) dropzone.classList.remove('drag-active');
 }
 
+let stagedRxFile = null;
+
 function handleRxDrop(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -4833,120 +4950,504 @@ function handleRxDrop(e) {
     if (dropzone) dropzone.classList.remove('drag-active');
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-        processUploadedPrescriptionFile(files[0]);
+        handleSelectedRxFile(files[0]);
     }
 }
 
 function handleRxFileSelect(e) {
     const file = e.target.files && e.target.files[0];
     if (file) {
-        processUploadedPrescriptionFile(file);
+        handleSelectedRxFile(file);
     }
 }
 
-async function processUploadedPrescriptionFile(file) {
-    const inner = document.getElementById('rx-dropzone-inner');
+function handleSelectedRxFile(file) {
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+        showToast('⚠️ File size exceeds 10MB limit. Please upload an image under 10MB.');
+        return;
+    }
+
+    const type = file.type ? file.type.toLowerCase() : '';
+    const name = file.name.toLowerCase();
+    const isImage = type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp');
+
+    if (!isImage) {
+        showToast('⚠️ Unsupported file format. Please upload a JPG, PNG, or WebP image.');
+        return;
+    }
+
+    stagedRxFile = file;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        const previewImg = document.getElementById('rx-preview-img');
+        const previewContainer = document.getElementById('rx-preview-container');
+        const dropzoneInner = document.getElementById('rx-dropzone-inner');
+        const previewMeta = document.getElementById('rx-preview-meta');
+        const progress = document.getElementById('rx-scanning-progress');
+        const emptyState = document.getElementById('detected-empty-state');
+        const resultsPanel = document.getElementById('rx-results-panel');
+        const errorContainer = document.getElementById('rx-scan-error-container');
+        const countBadge = document.getElementById('detected-count-badge');
+        const confirmBtn = document.getElementById('btn-confirm-add-history');
+
+        if (previewImg) previewImg.src = evt.target.result;
+        if (dropzoneInner) dropzoneInner.style.display = 'none';
+        if (progress) progress.style.display = 'none';
+        if (previewContainer) previewContainer.style.display = 'flex';
+
+        if (previewMeta) {
+            const sizeKb = (file.size / 1024).toFixed(1);
+            previewMeta.innerHTML = `
+                <span>📄 <strong>${escapeHtml(file.name)}</strong></span>
+                <span>•</span>
+                <span>⚖️ ${sizeKb} KB</span>
+                <span>•</span>
+                <span>🏷️ ${escapeHtml(file.type || 'image')}</span>
+            `;
+        }
+
+        if (resultsPanel) resultsPanel.style.display = 'none';
+        if (errorContainer) errorContainer.style.display = 'none';
+        if (emptyState) {
+            emptyState.style.display = 'block';
+            const ep = emptyState.querySelector('p');
+            if (ep) ep.innerHTML = `Prescription preview loaded. Click <strong>Scan Prescription</strong> to analyze with Gemini &amp; Groq.`;
+        }
+        if (countBadge) {
+            countBadge.textContent = 'Ready to Scan';
+            countBadge.classList.add('has-items');
+        }
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.classList.remove('active-ready');
+        }
+
+        showToast(`📄 Preview loaded: "${file.name}". Ready to scan.`);
+    };
+    reader.readAsDataURL(file);
+}
+
+function cancelRxFileSelection() {
+    stagedRxFile = null;
+    const fileInput = document.getElementById('upload-rx-file-input');
+    if (fileInput) fileInput.value = '';
+
+    const previewContainer = document.getElementById('rx-preview-container');
+    const dropzoneInner = document.getElementById('rx-dropzone-inner');
+    const progress = document.getElementById('rx-scanning-progress');
+
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (progress) progress.style.display = 'none';
+    if (dropzoneInner) dropzoneInner.style.display = 'block';
+
+    resetUploadRxView();
+    showToast('File selection cleared.');
+}
+
+async function performAiPrescriptionScan() {
+    if (!stagedRxFile) {
+        showToast('Please select a prescription image first.');
+        return;
+    }
+
+    const previewContainer = document.getElementById('rx-preview-container');
     const progress = document.getElementById('rx-scanning-progress');
     const emptyState = document.getElementById('detected-empty-state');
-    const itemsList = document.getElementById('detected-items-list');
+    const resultsPanel = document.getElementById('rx-results-panel');
+    const errorContainer = document.getElementById('rx-scan-error-container');
     const countBadge = document.getElementById('detected-count-badge');
     const confirmBtn = document.getElementById('btn-confirm-add-history');
 
-    if (inner) inner.style.display = 'none';
+    const statusHeading = document.getElementById('rx-scan-status-heading');
+    const statusDesc = document.getElementById('rx-scan-status-desc');
+
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (resultsPanel) resultsPanel.style.display = 'none';
+    if (errorContainer) errorContainer.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'none';
     if (progress) progress.style.display = 'block';
 
-    showToast(`📄 Uploaded: ${file.name}. Initializing Tesseract AI OCR...`);
+    if (countBadge) {
+        countBadge.textContent = 'Analyzing...';
+        countBadge.classList.add('has-items');
+    }
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.classList.remove('active-ready');
+    }
+
+    if (statusHeading) statusHeading.textContent = 'Analyzing with Gemini...';
+    if (statusDesc) statusDesc.textContent = 'Extracting handwriting, medicines, potencies, and clinical timings...';
+
+    const stepTimer = setTimeout(() => {
+        if (statusHeading) statusHeading.textContent = 'Cross-checking with Groq...';
+        if (statusDesc) statusDesc.textContent = 'Independent AI vision cross-verifying dosages, frequencies, and instructions...';
+    }, 1500);
+
+    const formData = new FormData();
+    formData.append('file', stagedRxFile);
+    if (state.currentUser && state.currentUser.id) {
+        formData.append('patientId', state.currentUser.id);
+    }
+    if (state.currentUser && state.currentUser.name) {
+        formData.append('patientName', state.currentUser.name);
+    }
 
     try {
-        // Run AI OCR extraction
-        const result = await extractPrescriptionWithOCR(file);
+        const response = await fetch('/api/prescriptions/scan', {
+            method: 'POST',
+            body: formData
+        });
+
+        clearTimeout(stepTimer);
+        const data = await response.json();
 
         if (progress) progress.style.display = 'none';
-        if (inner) {
-            inner.style.display = 'block';
-            const title = inner.querySelector('.rx-drop-title');
-            if (title) title.textContent = `Scanned: ${file.name}`;
+        if (previewContainer) previewContainer.style.display = 'flex';
+
+        if (data.success && data.data) {
+            renderScannedPrescriptionResult(data.data);
+        } else {
+            const msg = data.message || 'Unable to analyze prescription image.';
+            renderScannedPrescriptionError(msg);
         }
-
-        if (!result.isValid || !result.items || result.items.length === 0) {
-            // Invalid / Non-prescription
-            state.stagedRxData = null;
-
-            if (emptyState) {
-                emptyState.style.display = 'block';
-                emptyState.innerHTML = `
-                    <div style="display:flex; justify-content:center; margin-bottom:12px; color:#ef4444;"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg></div>
-                    <p style="color:#ef4444; font-weight:800; font-size:0.95rem; margin:0 0 6px;">No Prescription Detected</p>
-                    <small style="color:#64748b; line-height:1.45; display:block;">
-                        The uploaded image (<strong>${escapeHtml(file.name)}</strong>) does not contain recognized medical prescriptions or drug dosages.<br>
-                        Please upload a clear doctor's prescription or medical pad.
-                    </small>
-                `;
-            }
-            if (itemsList) {
-                itemsList.style.display = 'none';
-                itemsList.innerHTML = '';
-            }
-            if (countBadge) {
-                countBadge.textContent = '0 Found';
-                countBadge.classList.remove('has-items');
-            }
-            if (confirmBtn) {
-                confirmBtn.disabled = true;
-                confirmBtn.classList.remove('active-ready');
-            }
-
-            showToast(`⚠️ No medical medications detected in "${file.name}".`);
-            return;
-        }
-
-        // Successfully extracted prescription
-        state.stagedRxData = {
-            fileName: file.name,
-            doctorName: result.doctor || 'Dr. A. K. Azad (FCPS)',
-            hospital: result.hospital || 'Dhaka Medical College Hospital',
-            rawScanText: result.rawScanText,
-            items: result.items
-        };
-
-        if (emptyState) emptyState.style.display = 'none';
-        if (itemsList) {
-            itemsList.style.display = 'flex';
-            itemsList.innerHTML = result.items.map(item => `
-                <div class="detected-med-item">
-                    <div class="detected-med-top">
-                        <span class="detected-med-name">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px; color:var(--primary-blue, #1d4ed8);">
-                                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
-                                <path d="m8.5 8.5 7 7"/>
-                            </svg>
-                            ${escapeHtml(item.name)}
-                        </span>
-                        <span class="detected-med-strength">(${escapeHtml(item.strength)})</span>
-                    </div>
-                    <p class="detected-med-freq">${escapeHtml(item.freq)}</p>
-                </div>
-            `).join('');
-        }
-
-        if (countBadge) {
-            countBadge.textContent = `${result.items.length} Found`;
-            countBadge.classList.add('has-items');
-        }
-
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.classList.add('active-ready');
-        }
-
-        showToast(`✨ OCR Extracted ${result.items.length} medication(s) from "${file.name}"! Click 'Confirm & Add to History'.`);
-
     } catch (err) {
-        console.error(err);
+        clearTimeout(stepTimer);
+        console.error('Prescription scan failed:', err);
         if (progress) progress.style.display = 'none';
-        if (inner) inner.style.display = 'block';
-        showToast('Error analyzing prescription.');
+        if (previewContainer) previewContainer.style.display = 'flex';
+        renderScannedPrescriptionError('Network or server error while connecting to AI Vision backend. Please check your connection and try again.');
     }
+}
+
+function renderScannedPrescriptionResult(data) {
+    const emptyState = document.getElementById('detected-empty-state');
+    const errorContainer = document.getElementById('rx-scan-error-container');
+    const resultsPanel = document.getElementById('rx-results-panel');
+    const countBadge = document.getElementById('detected-count-badge');
+    const confirmBtn = document.getElementById('btn-confirm-add-history');
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (errorContainer) errorCo        if (data.verificationStatus === 'VERIFIED_BY_BOTH' || data.verificationStatus === 'CONFLICTS_DETECTED') {
+            banner.classList.add('verified');
+            banner.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span><strong>Prescription Verified</strong>: Analyzed and verified by Dual AI Vision (Gemini & Groq)</span>
+            `;
+        } else if (data.verificationStatus === 'GROQ_UNAVAILABLE') {
+            banner.classList.add('single-source');
+            banner.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="8"/>
+                </svg>
+                <span><strong>Gemini Analyzed</strong>: Groq cross-verification was unavailable. Single-engine extraction.</span>
+            `;
+        } else if (data.verificationStatus === 'GEMINI_UNAVAILABLE') {
+            banner.classList.add('single-source');
+            banner.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="8"/>
+                </svg>
+                <span><strong>Groq Analyzed</strong>: Gemini primary engine was unavailable. Single-engine extraction.</span>
+            `;
+        } else {
+            banner.classList.add('verified');
+            banner.innerHTML = `<span><strong>${escapeHtml(data.statusMessage || 'Prescription analyzed successfully')}</strong></span>`;
+        }
+    }
+
+    function isUncertainVal(val) {
+        if (!val) return true;
+        const s = String(val).trim().toLowerCase();
+        return s === 'uncertain' || s.includes('uncertain') || s === 'null' || s === 'undefined' || s === '-';
+    }
+
+    // 2. Prescription Information
+    let extractedPatientName = data.patientName || '';
+    if (extractedPatientName && !isUncertainVal(extractedPatientName)) {
+        extractedPatientName = extractedPatientName.replace(/\s*\(\s*\d+.*?\)/g, '')
+                                                   .replace(/\s*\(\s*[MFmf]\b.*?\)/g, '')
+                                                   .replace(/\s*\bAge\s*:\s*\d+.*/gi, '')
+                                                   .trim();
+    }
+
+    const patientElem = document.getElementById('rx-info-patient');
+    const patientSubElem = document.getElementById('rx-info-patient-sub');
+    if (patientElem) {
+        if (extractedPatientName && !isUncertainVal(extractedPatientName)) {
+            patientElem.textContent = extractedPatientName;
+        } else if (data.loggedInPatientName) {
+            patientElem.textContent = data.loggedInPatientName;
+        } else {
+            patientElem.textContent = 'Prescription Patient';
+        }
+    }
+    if (patientSubElem) {
+        if (data.loggedInPatientName && extractedPatientName && !isUncertainVal(extractedPatientName) && data.loggedInPatientName !== extractedPatientName) {
+            patientSubElem.textContent = `Account Holder: ${data.loggedInPatientName}`;
+        } else {
+            patientSubElem.textContent = '';
+        }
+    }
+
+    const docElem = document.getElementById('rx-info-doctor');
+    if (docElem) {
+        if (data.doctorName && !isUncertainVal(data.doctorName)) {
+            docElem.textContent = data.doctorName;
+        } else {
+            docElem.textContent = 'Licensed Physician';
+        }
+    }
+
+    const hospElem = document.getElementById('rx-info-hospital');
+    if (hospElem) {
+        if (data.hospitalName && !isUncertainVal(data.hospitalName)) {
+            hospElem.textContent = data.hospitalName;
+        } else {
+            hospElem.textContent = 'Hospital / Clinic';
+        }
+    }
+
+    // 3. Medication Schedule
+    const countSpan = document.getElementById('rx-meds-count-badge');
+    if (countSpan) countSpan.textContent = `${meds.length} Medicine(s)`;
+
+    if (countBadge) {
+        countBadge.textContent = `${meds.length} Found`;
+        countBadge.classList.add('has-items');
+    }
+
+    const itemsList = document.getElementById('detected-items-list');
+    if (itemsList) {
+        if (meds.length === 0) {
+            itemsList.innerHTML = `<p style="color:#64748b; font-size:0.86rem; text-align:center; padding:12px;">No medications detected on this prescription slip.</p>`;
+        } else {
+            itemsList.innerHTML = meds.map((item, idx) => {
+                const doseDisplay = isUncertainVal(item.dosageAmount) ? (isUncertainVal(item.dosageUnit) ? '' : item.dosageUnit) : (item.dosageAmount || item.dosageUnit || '');
+                const freqDisplay = isUncertainVal(item.frequency) ? '' : (item.frequency || '');
+                let mealDisplay = isUncertainVal(item.mealRelation) ? '' : (item.mealRelation || '');
+                let durDisplay = isUncertainVal(item.duration) ? '' : (item.duration || '');
+                const qtyDisplay = (item.totalQuantity && !isUncertainVal(item.totalQuantity)) ? `Total: ${item.totalQuantity}` : '';
+                const instructions = isUncertainVal(item.instructions) ? '' : (item.instructions || '');
+
+                // Deduce meal relation from instructions if missing
+                if (!mealDisplay) {
+                    const lowNotes = `${instructions} ${freqDisplay}`.toLowerCase();
+                    if (lowNotes.includes('before meal') || lowNotes.includes('before food') || lowNotes.includes('empty stomach') || lowNotes.includes('ac')) {
+                        mealDisplay = 'Before meal';
+                    } else if (lowNotes.includes('after meal') || lowNotes.includes('after food') || lowNotes.includes('after breakfast') || lowNotes.includes('after lunch') || lowNotes.includes('after dinner') || lowNotes.includes('pc')) {
+                        mealDisplay = 'After meal';
+                    } else if (lowNotes.includes('with meal') || lowNotes.includes('with food')) {
+                        mealDisplay = 'With meal';
+                    }
+                }
+
+                // Filter out any "Uncertain" timings
+                const rawTimingArr = Array.isArray(item.timing) ? item.timing : (item.timing ? [item.timing] : []);
+                let cleanTimings = rawTimingArr.filter(t => !isUncertainVal(t));
+
+                // If no clean timings, infer from frequency or instructions
+                if (cleanTimings.length === 0) {
+                    const combined = `${freqDisplay} ${instructions}`.toLowerCase();
+                    if (combined.includes('1+1+1') || combined.includes('3 times') || combined.includes('tid') || (combined.includes('morning') && combined.includes('afternoon') && combined.includes('night'))) {
+                        cleanTimings.push('Morning', 'Afternoon', 'Night');
+                    } else if (combined.includes('1+0+1') || combined.includes('2 times') || combined.includes('bid') || combined.includes('bd') || (combined.includes('morning') && combined.includes('night'))) {
+                        cleanTimings.push('Morning', 'Night');
+                    } else if (combined.includes('1+0+0') || combined.includes('morning') || combined.includes('breakfast') || combined.includes('empty stomach')) {
+                        cleanTimings.push('Morning');
+                    } else if (combined.includes('0+1+0') || combined.includes('afternoon') || combined.includes('lunch')) {
+                        cleanTimings.push('Afternoon');
+                    } else if (combined.includes('0+0+1') || combined.includes('night') || combined.includes('bedtime') || combined.includes('hs')) {
+                        cleanTimings.push('Night');
+                    } else if (combined.includes('stat') || combined.includes('immediately')) {
+                        cleanTimings.push('Immediately (Stat)');
+                    } else if (combined.includes('once daily') || combined.includes('od')) {
+                        cleanTimings.push('Once Daily');
+                    }
+                }
+
+                const exactArr = (Array.isArray(item.exactTimes) ? item.exactTimes : (item.exactTimes ? [item.exactTimes] : []))
+                    .filter(ex => !isUncertainVal(ex));
+
+                let timeBadges = [];
+                cleanTimings.forEach(t => {
+                    const low = t.toLowerCase();
+                    let icon = '⏰';
+                    if (low.includes('morn')) icon = '🌅';
+                    else if (low.includes('noon') || low.includes('afternoon')) icon = '☀️';
+                    else if (low.includes('eve')) icon = '🌇';
+                    else if (low.includes('night') || low.includes('bed')) icon = '🌙';
+                    else if (low.includes('stat') || low.includes('immed')) icon = '⚡';
+                    else if (low.includes('once') || low.includes('daily')) icon = '📅';
+                    timeBadges.push(`<span class="rx-time-chip">${icon} ${escapeHtml(t)}</span>`);
+                });
+
+                exactArr.forEach(ex => {
+                    timeBadges.push(`<span class="rx-time-chip">🕒 ${escapeHtml(ex)}</span>`);
+                });
+
+                // Frequency chip (strictly exclude uncertain)
+                if (freqDisplay && !isUncertainVal(freqDisplay)) {
+                    timeBadges.push(`<span class="rx-freq-chip">🔄 ${escapeHtml(freqDisplay)}</span>`);
+                }
+
+                // Meal chip (strictly exclude uncertain)
+                if (mealDisplay && !isUncertainVal(mealDisplay) && mealDisplay !== '-') {
+                    timeBadges.push(`<span class="rx-meal-chip">🍽️ ${escapeHtml(mealDisplay)}</span>`);
+                }
+
+                // If still no badges, use clinical fallback
+                if (timeBadges.length === 0) {
+                    timeBadges.push(`<span class="rx-time-chip">⏰ As Prescribed</span>`);
+                }
+
+                // Duration chip (strictly exclude uncertain)
+                if (durDisplay && !isUncertainVal(durDisplay) && durDisplay !== '-') {
+                    timeBadges.push(`<span class="rx-dur-chip">⏳ ${escapeHtml(durDisplay)}</span>`);
+                } else {
+                    timeBadges.push(`<span class="rx-dur-chip">⏳ As directed</span>`);
+                }
+
+                const takenTimeChipsHtml = timeBadges.join(' ');
+
+                return `
+                    <div class="rx-medicine-section-card">
+                        <div class="rx-med-card-header">
+                            <div class="rx-med-name-wrap">
+                                <span class="rx-med-index-badge">${idx + 1}</span>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-blue, #1d4ed8);">
+                                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
+                                    <path d="m8.5 8.5 7 7"/>
+                                </svg>
+                                <span class="rx-med-title">${escapeHtml(item.medicineName || 'Medication')}</span>
+                                ${item.strength && !isUncertainVal(item.strength) ? `<span class="rx-med-strength-badge">${escapeHtml(item.strength)}</span>` : ''}
+                            </div>
+                            <span class="rx-verified-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Extracted</span>
+                        </div>
+
+                        <!-- Dedicated Medicine Taken Time Section -->
+                        <div class="rx-taken-time-section">
+                            <div class="rx-taken-time-label">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span>Medicine Taken Time:</span>
+                            </div>
+                            <div class="rx-time-chips-row">
+                                ${takenTimeChipsHtml}
+                            </div>
+                        </div>
+
+                        <div class="rx-med-details-grid">
+                            ${doseDisplay ? `<span><strong>Dose:</strong> ${escapeHtml(doseDisplay)}</span><span>•</span>` : ''}
+                            ${qtyDisplay ? `<span><strong>Quantity:</strong> ${escapeHtml(qtyDisplay)}</span><span>•</span>` : ''}
+                            <span><strong>Course:</strong> ${escapeHtml(durDisplay ? durDisplay : 'As prescribed')}</span>
+                        </div>
+
+                        ${instructions ? `<div class="rx-med-note-block"><strong>Advice:</strong> ${escapeHtml(instructions)}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // 4. Raw Extracted Text
+    const rawBody = document.getElementById('rx-raw-text-body');
+    if (rawBody) {
+        rawBody.textContent = data.rawText || 'No transcribed text available.';
+    }
+
+    // 5. Stage data for save/history confirmation
+    const finalPatient = (extractedPatientName && !isUncertainVal(extractedPatientName))
+        ? extractedPatientName
+        : (data.loggedInPatientName || (state.currentUser ? state.currentUser.name : 'Patient'));
+    const finalDoctor = (data.doctorName && !isUncertainVal(data.doctorName))
+        ? data.doctorName
+        : 'Dr. Consulting Physician';
+
+    state.stagedRxData = {
+        fileName: stagedRxFile ? stagedRxFile.name : 'prescription_scan.jpg',
+        patientName: finalPatient,
+        doctorName: finalDoctor,
+        hospital: (data.hospitalName && !isUncertainVal(data.hospitalName)) ? data.hospitalName : 'Hospital / Clinic',
+        rawScanText: data.rawText || '',
+        items: meds.map(m => {
+            const rawTiming = Array.isArray(m.timing) ? m.timing : (m.timing ? [m.timing] : []);
+            const cleanTiming = rawTiming.filter(t => !isUncertainVal(t));
+            const rawExact = Array.isArray(m.exactTimes) ? m.exactTimes : (m.exactTimes ? [m.exactTimes] : []);
+            const cleanExact = rawExact.filter(ex => !isUncertainVal(ex));
+            const doseClean = isUncertainVal(m.dosageAmount) ? (m.strength || '1 unit') : (m.dosageAmount || m.strength || '1 unit');
+            const freqClean = isUncertainVal(m.frequency) ? 'As directed' : (m.frequency || 'As directed');
+            const durClean = isUncertainVal(m.duration) ? 'As directed' : (m.duration || 'As directed');
+            const mealClean = isUncertainVal(m.mealRelation) ? '' : (m.mealRelation || '');
+
+            return {
+                medicineName: m.medicineName || 'Medication',
+                genericName: m.genericName || '',
+                strength: isUncertainVal(m.strength) ? '' : (m.strength || ''),
+                dosage: doseClean,
+                frequency: freqClean,
+                timing: cleanTiming.join(', '),
+                exactTimes: cleanExact.join(', '),
+                mealRelation: mealClean,
+                duration: durClean,
+                totalQuantity: isUncertainVal(m.totalQuantity) ? '' : (m.totalQuantity || ''),
+                instructions: isUncertainVal(m.instructions) ? '' : (m.instructions || '')
+            };
+        })
+    };
+
+    if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.classList.add('active-ready');
+    }
+
+    showToast(`✨ Successfully extracted ${meds.length} medication(s)!`);
+}
+
+function renderScannedPrescriptionError(message) {
+    const emptyState = document.getElementById('detected-empty-state');
+    const resultsPanel = document.getElementById('rx-results-panel');
+    const errorContainer = document.getElementById('rx-scan-error-container');
+    const errorMsg = document.getElementById('rx-error-msg');
+    const countBadge = document.getElementById('detected-count-badge');
+    const confirmBtn = document.getElementById('btn-confirm-add-history');
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (resultsPanel) resultsPanel.style.display = 'none';
+    if (errorContainer) errorContainer.style.display = 'block';
+    if (errorMsg) errorMsg.textContent = message;
+
+    if (countBadge) {
+        countBadge.textContent = 'Scan Failed';
+        countBadge.classList.remove('has-items');
+    }
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.classList.remove('active-ready');
+    }
+
+    showToast(`⚠️ ${message}`);
+}
+
+function toggleRawTextCollapse() {
+    const body = document.getElementById('rx-raw-text-body');
+    const icon = document.getElementById('raw-text-toggle-icon');
+    if (body) {
+        const isHidden = body.style.display === 'none';
+        body.style.display = isHidden ? 'block' : 'none';
+        if (icon) icon.textContent = isHidden ? '▲' : '▼';
+    }
+}
+
+// Fallback legacy client-side OCR
+async function processUploadedPrescriptionFile(file) {
+    handleSelectedRxFile(file);
 }
 
 async function extractPrescriptionWithOCR(file) {
@@ -5108,17 +5609,20 @@ async function confirmAndAddRxToHistory() {
     if (!state.stagedRxData) return;
 
     try {
+        const payload = {
+            patientId: state.currentUser ? state.currentUser.id : 'usr_patient_01',
+            patientName: state.stagedRxData.patientName || (state.currentUser ? state.currentUser.name : 'Patient'),
+            doctorName: state.stagedRxData.doctorName || 'Dr. Consulting Physician',
+            hospital: state.stagedRxData.hospital || 'Hospital / Clinic',
+            scanText: state.stagedRxData.rawScanText || '',
+            voiceNoteAudio: voiceAudioBase64 || '',
+            items: state.stagedRxData.items || []
+        };
+
         const res = await fetch('/api/prescriptions/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                patientId: state.currentUser.id,
-                patientName: state.currentUser.name,
-                doctorName: state.stagedRxData.doctorName,
-                hospital: state.stagedRxData.hospital,
-                scanText: state.stagedRxData.rawScanText,
-                voiceNoteAudio: voiceAudioBase64
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
@@ -5154,23 +5658,42 @@ async function confirmAndAddRxToHistory() {
 
 function resetUploadRxView() {
     state.stagedRxData = null;
+    stagedRxFile = null;
+
+    const fileInput = document.getElementById('upload-rx-file-input');
+    if (fileInput) fileInput.value = '';
+
     const inner = document.getElementById('rx-dropzone-inner');
+    const previewContainer = document.getElementById('rx-preview-container');
+    const progress = document.getElementById('rx-scanning-progress');
     const emptyState = document.getElementById('detected-empty-state');
+    const resultsPanel = document.getElementById('rx-results-panel');
+    const errorContainer = document.getElementById('rx-scan-error-container');
     const itemsList = document.getElementById('detected-items-list');
     const countBadge = document.getElementById('detected-count-badge');
     const confirmBtn = document.getElementById('btn-confirm-add-history');
 
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (progress) progress.style.display = 'none';
+    if (resultsPanel) resultsPanel.style.display = 'none';
+    if (errorContainer) errorContainer.style.display = 'none';
+
     if (inner) {
+        inner.style.display = 'block';
         const title = inner.querySelector('.rx-drop-title');
         if (title) title.textContent = 'Drag & Drop Prescription';
     }
-    if (emptyState) emptyState.style.display = 'block';
+    if (emptyState) {
+        emptyState.style.display = 'block';
+        const ep = emptyState.querySelector('p');
+        if (ep) ep.innerHTML = 'Select a prescription image and click <strong>Scan Prescription</strong> to extract structured clinical information with Gemini &amp; Groq.';
+    }
     if (itemsList) {
         itemsList.style.display = 'none';
         itemsList.innerHTML = '';
     }
     if (countBadge) {
-        countBadge.textContent = '0 Found';
+        countBadge.textContent = 'Ready to Scan';
         countBadge.classList.remove('has-items');
     }
     if (confirmBtn) {

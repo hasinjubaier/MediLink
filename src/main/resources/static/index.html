@@ -1808,12 +1808,12 @@
 
                     <!-- 2-Column Workspace Grid -->
                     <div class="upload-rx-grid">
-                        <!-- Left Column: Drag & Drop Dropzone Card -->
+                        <!-- Left Column: Drag & Drop Dropzone & Preview Card -->
                         <div class="upload-rx-card left-dropzone-card">
                             <div class="upload-rx-dropzone" id="upload-rx-dropzone" onclick="triggerRxScanUpload()"
                                 ondragover="handleRxDragOver(event)" ondragleave="handleRxDragLeave(event)"
                                 ondrop="handleRxDrop(event)">
-                                <input type="file" id="upload-rx-file-input" accept="image/*,.pdf" style="display:none;"
+                                <input type="file" id="upload-rx-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;"
                                     onchange="handleRxFileSelect(event)">
 
                                 <div class="rx-dropzone-inner" id="rx-dropzone-inner">
@@ -1831,73 +1831,141 @@
                                     <div class="rx-format-tags">
                                         <span class="format-tag">PNG</span>
                                         <span class="format-tag">JPG</span>
-                                        <span class="format-tag">PDF</span>
+                                        <span class="format-tag">WEBP</span>
                                         <span class="format-size">(Max 10MB)</span>
                                     </div>
                                 </div>
 
-                                <!-- OCR Scanning State -->
-                                <div class="rx-scanning-progress" id="rx-scanning-progress" style="display:none;">
+                                <!-- Image Preview Container -->
+                                <div class="rx-preview-container" id="rx-preview-container" style="display:none;" onclick="event.stopPropagation()">
+                                    <div class="rx-preview-img-wrapper">
+                                        <img id="rx-preview-img" src="" alt="Prescription Preview">
+                                    </div>
+                                    <div class="rx-preview-meta" id="rx-preview-meta"></div>
+                                    <div class="rx-preview-actions">
+                                        <button type="button" class="btn-scan-main" id="btn-trigger-scan" onclick="performAiPrescriptionScan()">
+                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+                                            </svg>
+                                            <span>Scan Prescription</span>
+                                        </button>
+                                        <button type="button" class="btn-cancel-file" onclick="cancelRxFileSelection()">
+                                            Choose Another
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- AI Vision Scanning State -->
+                                <div class="rx-scanning-progress" id="rx-scanning-progress" style="display:none;" onclick="event.stopPropagation()">
                                     <div class="scan-laser-spinner"></div>
-                                    <h4 style="margin:12px 0 4px; color:#0284c7; font-weight:800; display:inline-flex; align-items:center; gap:6px;">
+                                    <h4 id="rx-scan-status-title" style="margin:12px 0 4px; color:#0284c7; font-weight:800; display:inline-flex; align-items:center; gap:6px;">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <rect width="16" height="16" x="4" y="4" rx="2"/>
                                             <rect width="6" height="6" x="9" y="9" rx="1"/>
-                                            <path d="M15 2v2"/>
-                                            <path d="M15 20v2"/>
-                                            <path d="M2 15h2"/>
-                                            <path d="M2 9h2"/>
-                                            <path d="M20 15h2"/>
-                                            <path d="M20 9h2"/>
-                                            <path d="M9 2v2"/>
-                                            <path d="M9 20v2"/>
+                                            <path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/>
+                                            <path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>
                                         </svg>
-                                        <span>AI OCR Analyzing Prescription...</span>
+                                        <span id="rx-scan-status-heading">Analyzing with Gemini...</span>
                                     </h4>
-                                    <p style="font-size:0.85rem; color:#64748b; margin:0;">Extracting generic molecules,
-                                        dosage instructions & schedule...</p>
+                                    <p id="rx-scan-status-desc" style="font-size:0.85rem; color:#64748b; margin:0;">
+                                        Multimodal AI vision extracting medication names, strengths &amp; clinical schedule...
+                                    </p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Right Column: Detected Items Card -->
+                        <!-- Right Column: Detected Items & Results Card -->
                         <div class="upload-rx-card right-detected-card">
                             <div class="detected-card-header">
                                 <div class="detected-title-row">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7"
-                                        stroke-width="2">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2">
                                         <rect width="18" height="18" x="3" y="3" rx="2" />
-                                        <path d="M3 9h18" />
-                                        <path d="M3 15h18" />
-                                        <path d="M9 3v18" />
-                                        <path d="M15 3v18" />
+                                        <path d="M3 9h18" /><path d="M3 15h18" /><path d="M9 3v18" /><path d="M15 3v18" />
                                     </svg>
-                                    <h3>Detected Items</h3>
+                                    <h3>Prescription Analysis</h3>
                                 </div>
-                                <span class="detected-count-badge" id="detected-count-badge">0 Found</span>
+                                <span class="detected-count-badge" id="detected-count-badge">Ready to Scan</span>
                             </div>
 
                             <div class="detected-card-body" id="detected-card-body">
                                 <!-- Empty State -->
                                 <div class="detected-empty-state" id="detected-empty-state">
                                     <div class="empty-scan-icon">
-                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1"
-                                            stroke-width="1.5">
-                                            <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-                                            <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-                                            <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-                                            <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5">
+                                            <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                                            <path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" />
                                             <rect width="10" height="10" x="7" y="7" rx="1" />
                                         </svg>
                                     </div>
-                                    <p>Upload a prescription to begin extracting details.</p>
+                                    <p>Select a prescription image and click <strong>Scan Prescription</strong> to extract structured clinical information with Gemini &amp; Groq.</p>
                                 </div>
 
-                                <!-- Detected Medicines List Container -->
-                                <div class="detected-items-list" id="detected-items-list" style="display:none;"></div>
+                                <!-- Error State -->
+                                <div id="rx-scan-error-container" style="display:none; text-align:center; padding:20px;">
+                                    <div style="color:#ef4444; margin-bottom:10px;">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                        </svg>
+                                    </div>
+                                    <h4 id="rx-error-title" style="color:#ef4444; margin:0 0 6px; font-weight:800;">Prescription Scan Failed</h4>
+                                    <p id="rx-error-msg" style="color:#64748b; font-size:0.86rem; margin:0 0 14px; line-height:1.4;"></p>
+                                    <button type="button" class="btn-scan-main" onclick="performAiPrescriptionScan()" style="padding:8px 16px; font-size:0.85rem;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                                        <span>Retry Scan</span>
+                                    </button>
+                                </div>
+
+                                <!-- Structured Results Panel -->
+                                <div id="rx-results-panel" style="display:none;">
+                                    <!-- Verification Status Banner -->
+                                    <div class="rx-verification-banner" id="rx-verification-banner"></div>
+
+                                    <!-- Prescription Information -->
+                                    <div class="rx-info-grid">
+                                        <div class="rx-info-item">
+                                            <label>Patient Name</label>
+                                            <div class="val" id="rx-info-patient">-</div>
+                                            <div id="rx-info-patient-sub" style="font-size:0.75rem; color:#64748b; margin-top:2px;"></div>
+                                        </div>
+                                        <div class="rx-info-item">
+                                            <label>Doctor Name</label>
+                                            <div class="val" id="rx-info-doctor">-</div>
+                                        </div>
+                                        <div class="rx-info-item">
+                                            <label>Hospital / Clinic</label>
+                                            <div class="val" id="rx-info-hospital">-</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Medication Schedule Header -->
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <h4 style="margin:0; font-size:0.92rem; font-weight:800; color:var(--text-heading);">Medication Schedule</h4>
+                                        <span id="rx-meds-count-badge" style="font-size:0.72rem; color:var(--primary-blue); font-weight:700;"></span>
+                                    </div>
+
+                                    <!-- Detected Medicines List Container -->
+                                    <div class="detected-items-list" id="detected-items-list"></div>
+
+                                    <!-- Raw Extracted Text (Collapsible) -->
+                                    <div class="rx-raw-text-wrapper" id="rx-raw-text-wrapper">
+                                        <div class="rx-raw-text-header" onclick="toggleRawTextCollapse()">
+                                            <span>📄 Raw Extracted Text</span>
+                                            <span id="raw-text-toggle-icon">▼</span>
+                                        </div>
+                                        <div class="rx-raw-text-body" id="rx-raw-text-body" style="display:none;"></div>
+                                    </div>
+
+                                    <!-- Clinical Safety Notice -->
+                                    <div class="rx-medical-safety-note">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;">
+                                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                                        </svg>
+                                        <div>
+                                            <strong>Medical Safety Notice:</strong> AI-extracted prescription information. Please verify the prescription with a doctor or pharmacist before taking medication, especially when any text is unclear.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-
-
 
                             <div class="detected-card-footer">
                                 <button type="button" class="btn-confirm-add-history" id="btn-confirm-add-history"
