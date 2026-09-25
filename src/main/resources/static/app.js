@@ -5131,7 +5131,15 @@ function renderScannedPrescriptionResult(data) {
     const confirmBtn = document.getElementById('btn-confirm-add-history');
 
     if (emptyState) emptyState.style.display = 'none';
-    if (errorContainer) errorCo        if (data.verificationStatus === 'VERIFIED_BY_BOTH' || data.verificationStatus === 'CONFLICTS_DETECTED') {
+    if (errorContainer) errorContainer.style.display = 'none';
+    if (resultsPanel) resultsPanel.style.display = 'block';
+
+    const meds = data.medicines || [];
+
+    // 1. Verification status banner
+    const banner = document.getElementById('rx-verification-banner');
+    if (banner) {
+        if (data.verificationStatus === 'VERIFIED_BY_BOTH' || data.verificationStatus === 'CONFLICTS_DETECTED') {
             banner.classList.add('verified');
             banner.innerHTML = `
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
