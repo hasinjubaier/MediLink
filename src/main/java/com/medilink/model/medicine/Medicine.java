@@ -84,6 +84,9 @@ public class Medicine {
     public String getFormulation() { return formulation; }
     public void setFormulation(String formulation) { this.formulation = formulation; }
 
+    public String getDosageForm() { return formulation; }
+    public void setDosageForm(String dosageForm) { this.formulation = dosageForm; }
+
     public double getUnitPrice() { return unitPrice; }
     public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
 

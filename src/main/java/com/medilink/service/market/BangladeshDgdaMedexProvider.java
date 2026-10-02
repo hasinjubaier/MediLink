@@ -76,7 +76,7 @@ public class BangladeshDgdaMedexProvider implements MarketPriceProvider {
     }
 
     private void add(String brand, String generic, String mfg, String str, String form, double mrp, String date) {
-        MarketPriceItem item = new MarketPriceItem(brand, generic, mfg, str, form, mrp, date, "DGDA National Drug Index / Medex BD");
+        MarketPriceItem item = new MarketPriceItem(brand, generic, mfg, str, form, mrp, date, "Local fallback/demo registry");
         marketRegistry.put(brand.toLowerCase().trim(), item);
     }
 
@@ -91,10 +91,10 @@ public class BangladeshDgdaMedexProvider implements MarketPriceProvider {
         MarketPriceItem exact = marketRegistry.get(brandName.toLowerCase().trim());
         if (exact != null) return Optional.of(exact);
 
-        // Fuzzy search by brand contains
+        // Exact normalized match or trimmed match
         String lower = brandName.toLowerCase().trim();
         for (Map.Entry<String, MarketPriceItem> entry : marketRegistry.entrySet()) {
-            if (entry.getKey().contains(lower) || lower.contains(entry.getKey())) {
+            if (entry.getKey().equalsIgnoreCase(lower)) {
                 return Optional.of(entry.getValue());
             }
         }
@@ -114,13 +114,12 @@ public class BangladeshDgdaMedexProvider implements MarketPriceProvider {
 
     @Override
     public String getProviderName() {
-        return configuredApiUrl != null && !configuredApiUrl.isEmpty()
-                ? "Live External BD Market Gateway (" + configuredApiUrl + ")"
-                : "Bangladesh DGDA & Medex Benchmark Index";
+        return "Local fallback/demo registry";
     }
 
     @Override
     public boolean isLiveApiConnected() {
-        return configuredApiUrl != null && !configuredApiUrl.isEmpty();
+        // Internal benchmark registry; external live connectivity is managed via Apify / External provider
+        return false;
     }
 }

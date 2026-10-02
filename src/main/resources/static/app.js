@@ -48,6 +48,9 @@ function ensureAuthSessionLoaded() {
             try {
                 const user = JSON.parse(savedUser);
                 if (user && user.email) {
+                    if (user.customAvatar && user.customAvatar.includes('images.unsplash.com')) {
+                        delete user.customAvatar;
+                    }
                     applyAuthenticatedUser(user, false);
                 }
             } catch (e) {
@@ -210,10 +213,24 @@ function launchApp(context) {
     } else if (context === 'admin') {
         switchTab('admin');
     } else if (context === 'prescriptions') {
-        switchTab('prescriptions');
+        const curRole = (state.currentUser?.role || state.activeRole || '').toUpperCase();
+        if (curRole === 'PHARMACIST') {
+            switchTab('stock');
+        } else if (curRole === 'ADMIN') {
+            switchTab('admin');
+        } else {
+            switchTab('prescriptions');
+        }
     } else if (context === 'reminders') {
         switchTab('reminders');
     } else if (context === 'upload-rx') {
+        const curRole = (state.currentUser?.role || state.activeRole || '').toUpperCase();
+        if (curRole === 'PHARMACIST' || curRole === 'ADMIN') {
+            showToast('Prescription uploading is only available for Patient accounts.');
+            if (curRole === 'PHARMACIST') switchTab('stock');
+            else switchTab('admin');
+            return;
+        }
         switchTab('upload-rx');
     } else if (context === 'verify') {
         switchTab('verify');
@@ -371,32 +388,32 @@ function selectAuthRole(role, formType) {
 
 const COUNTRIES_DATA = [
     { code: 'bd', dial: '+880', name: 'Bangladesh' },
-    { code: 'us', dial: '+1',   name: 'United States' },
-    { code: 'gb', dial: '+44',  name: 'United Kingdom' },
-    { code: 'in', dial: '+91',  name: 'India' },
-    { code: 'pk', dial: '+92',  name: 'Pakistan' },
+    { code: 'us', dial: '+1', name: 'United States' },
+    { code: 'gb', dial: '+44', name: 'United Kingdom' },
+    { code: 'in', dial: '+91', name: 'India' },
+    { code: 'pk', dial: '+92', name: 'Pakistan' },
     { code: 'ae', dial: '+971', name: 'United Arab Emirates' },
     { code: 'sa', dial: '+966', name: 'Saudi Arabia' },
-    { code: 'ca', dial: '+1',   name: 'Canada' },
-    { code: 'au', dial: '+61',  name: 'Australia' },
-    { code: 'my', dial: '+60',  name: 'Malaysia' },
-    { code: 'sg', dial: '+65',  name: 'Singapore' },
+    { code: 'ca', dial: '+1', name: 'Canada' },
+    { code: 'au', dial: '+61', name: 'Australia' },
+    { code: 'my', dial: '+60', name: 'Malaysia' },
+    { code: 'sg', dial: '+65', name: 'Singapore' },
     { code: 'qa', dial: '+974', name: 'Qatar' },
     { code: 'kw', dial: '+965', name: 'Kuwait' },
     { code: 'om', dial: '+968', name: 'Oman' },
-    { code: 'de', dial: '+49',  name: 'Germany' },
-    { code: 'fr', dial: '+33',  name: 'France' },
-    { code: 'it', dial: '+39',  name: 'Italy' },
-    { code: 'tr', dial: '+90',  name: 'Turkey' },
+    { code: 'de', dial: '+49', name: 'Germany' },
+    { code: 'fr', dial: '+33', name: 'France' },
+    { code: 'it', dial: '+39', name: 'Italy' },
+    { code: 'tr', dial: '+90', name: 'Turkey' },
     { code: 'np', dial: '+977', name: 'Nepal' },
-    { code: 'lk', dial: '+94',  name: 'Sri Lanka' },
-    { code: 'jp', dial: '+81',  name: 'Japan' },
-    { code: 'cn', dial: '+86',  name: 'China' },
-    { code: 'kr', dial: '+82',  name: 'South Korea' },
-    { code: 'br', dial: '+55',  name: 'Brazil' },
-    { code: 'za', dial: '+27',  name: 'South Africa' },
-    { code: 'eg', dial: '+20',  name: 'Egypt' },
-    { code: 'es', dial: '+34',  name: 'Spain' }
+    { code: 'lk', dial: '+94', name: 'Sri Lanka' },
+    { code: 'jp', dial: '+81', name: 'Japan' },
+    { code: 'cn', dial: '+86', name: 'China' },
+    { code: 'kr', dial: '+82', name: 'South Korea' },
+    { code: 'br', dial: '+55', name: 'Brazil' },
+    { code: 'za', dial: '+27', name: 'South Africa' },
+    { code: 'eg', dial: '+20', name: 'Egypt' },
+    { code: 'es', dial: '+34', name: 'Spain' }
 ];
 
 let _selectedCountry = COUNTRIES_DATA[0];
@@ -405,9 +422,9 @@ function renderCountryDropdown(filterText = '') {
     const listEl = document.getElementById('country-list-items');
     if (!listEl) return;
     const q = filterText.toLowerCase().trim();
-    const filtered = COUNTRIES_DATA.filter(c => 
-        c.name.toLowerCase().includes(q) || 
-        c.dial.includes(q) || 
+    const filtered = COUNTRIES_DATA.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.dial.includes(q) ||
         c.code.toLowerCase().includes(q)
     );
 
@@ -453,7 +470,7 @@ function filterCountries(value) {
 
 function selectCountryItem(code, dial, name) {
     _selectedCountry = COUNTRIES_DATA.find(c => c.code === code) || { code, dial, name };
-    
+
     // Update trigger button flag & code
     const flagImg = document.getElementById('selected-country-flag');
     const codeText = document.getElementById('selected-country-code');
@@ -559,7 +576,7 @@ function handlePasswordInput() {
 
 function checkPasswordStrength() {
     const pass = document.getElementById('signup-password')?.value || '';
-    
+
     const ruleLength = pass.length >= 8;
     const ruleUpper = /[A-Z]/.test(pass);
     const ruleLower = /[a-z]/.test(pass);
@@ -699,7 +716,7 @@ async function handleAuthSubmit(event, formType) {
                 applyAuthenticatedUser(data, true);
                 closeModal('modal-auth');
                 showToast(`🎉 Signed in successfully! Welcome, ${data.name} (${data.role}).`);
-                
+
                 // Role-wise dashboard redirection
                 if (data.role === 'PATIENT') {
                     launchApp('patient');
@@ -917,7 +934,7 @@ async function handleAuthSubmit(event, formType) {
                 showToast(`✅ Account created for ${name}! Click 'Sign In' to enter.`);
             } else {
                 const isExisting = (data.message || '').toLowerCase().includes('already exists') ||
-                                   (data.message || '').toLowerCase().includes('already registered');
+                    (data.message || '').toLowerCase().includes('already registered');
                 showSignupError(data.message || 'Registration failed.', isExisting ? emailInput : null, isExisting);
             }
         } catch (e) {
@@ -946,19 +963,15 @@ const FEMALE_INDICATORS = [
 ];
 
 const ADMIN_DEFAULT_AVATAR = 'assets/images/admin_avatar.png';
+const MALE_DEFAULT_AVATAR = 'assets/images/patient_male.jpg';
+const FEMALE_DEFAULT_AVATAR = 'assets/images/patient_female.jpg';
 
 const MALE_PHOTOS = [
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=160&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=160&auto=format&fit=crop&q=80'
+    MALE_DEFAULT_AVATAR
 ];
 
 const FEMALE_PHOTOS = [
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=160&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=160&auto=format&fit=crop&q=80'
+    FEMALE_DEFAULT_AVATAR
 ];
 
 function detectGender(name = '', genderExplicit = '') {
@@ -1009,14 +1022,22 @@ function getUserAvatarAssets(name = '', gender = '', role = 'PATIENT') {
 function updateUserAvatars(user = state.currentUser) {
     if (!user) return;
     const avatarAssets = getUserAvatarAssets(user.name, user.gender, user.role);
-    
-    // Priority: custom uploaded photo -> user.photo/avatar -> gender-matched avatar library photo
-    const avatarSrc = (user.customAvatar && user.customAvatar.trim())
+
+    // Discard any stale Unsplash demo photo from storage or defaults so new patient male/female avatars take precedence
+    let custom = (user.customAvatar && user.customAvatar.trim())
         || (user.photo && user.photo.trim())
         || (user.avatar && user.avatar.trim())
-        || (user.profilePic && user.profilePic.trim())
-        || (avatarAssets && avatarAssets.photo)
-        || '';
+        || (user.profilePic && user.profilePic.trim());
+
+    if (custom && custom.includes('images.unsplash.com')) {
+        custom = null;
+        if (user.customAvatar && user.customAvatar.includes('images.unsplash.com')) delete user.customAvatar;
+        if (user.photo && user.photo.includes('images.unsplash.com')) delete user.photo;
+        if (user.avatar && user.avatar.includes('images.unsplash.com')) delete user.avatar;
+    }
+
+    // Priority: custom uploaded photo -> gender-matched patient avatar photo
+    const avatarSrc = custom || (avatarAssets && avatarAssets.photo) || '';
 
     // 1. App Top Navbar Profile Button (Header right in #view-app)
     const appHeaderAvatar = document.getElementById('app-header-user-avatar');
@@ -1113,7 +1134,7 @@ let forgotRecoveryState = {
 
 function openForgotPasswordModal(prefilledEmail = '') {
     closeModal('modal-auth');
-    
+
     if (!prefilledEmail) {
         const signinInput = document.getElementById('signin-email');
         if (signinInput && signinInput.value.trim()) {
@@ -1448,7 +1469,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
     } else if (user.emergencyContactsJson) {
         try {
             ecList = JSON.parse(user.emergencyContactsJson);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     state.currentUser = {
@@ -1498,6 +1519,13 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
         else portalIndicator.textContent = `${user.role} Portal`;
     }
 
+    // Set portal role attribute on view-app and body for role-based styling
+    const appView = document.getElementById('view-app');
+    if (appView) {
+        appView.setAttribute('data-portal-role', user.role || 'PATIENT');
+    }
+    document.body.setAttribute('data-portal-role', user.role || 'PATIENT');
+
     // 2. Update Patient Dashboard Header
     const dashName = document.getElementById('patient-dash-name');
     const dashBadge = document.getElementById('patient-dash-badge');
@@ -1510,6 +1538,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
 
     // 3. Adapt Sidebar Navigation to Active Role
     const dashTabBtn = document.getElementById('tab-btn-dashboard');
+    const rxTabBtn = document.getElementById('tab-btn-prescriptions');
     const stockTabBtn = document.getElementById('tab-btn-stock');
     const verifyTabBtn = document.getElementById('tab-btn-verify');
     const settingsTabBtn = document.getElementById('tab-btn-settings');
@@ -1518,28 +1547,44 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
     const chatNavLabel = document.getElementById('tab-btn-chat-label');
     const remTabBtn = document.getElementById('tab-btn-reminders');
 
+    const topUploadBtn = document.querySelector('.btn-top-upload');
+    const rxUploadNewBtn = document.getElementById('btn-upload-new-rx');
+    const chatAttachBtn = document.querySelector('.btn-chat-attach');
+
     if (user.role === 'PATIENT') {
         if (dashTabBtn) dashTabBtn.style.display = 'flex';
+        if (rxTabBtn) rxTabBtn.style.display = 'flex';
         if (settingsTabBtn) settingsTabBtn.style.display = 'flex';
         if (stockTabBtn) stockTabBtn.style.display = 'none';
         if (adminTabBtn) adminTabBtn.style.display = 'none';
         if (remTabBtn) remTabBtn.style.display = 'flex';
         if (chatNavLabel) chatNavLabel.textContent = 'Pharmacist Live Chat';
+        if (topUploadBtn) topUploadBtn.style.display = 'inline-block';
+        if (rxUploadNewBtn) rxUploadNewBtn.style.display = '';
+        if (chatAttachBtn) chatAttachBtn.style.display = '';
     } else if (user.role === 'PHARMACIST') {
         if (dashTabBtn) dashTabBtn.style.display = 'none';
+        if (rxTabBtn) rxTabBtn.style.display = 'none';
         if (settingsTabBtn) settingsTabBtn.style.display = 'none';
         if (stockTabBtn) stockTabBtn.style.display = 'flex';
         if (adminTabBtn) adminTabBtn.style.display = 'none';
         if (remTabBtn) remTabBtn.style.display = 'none';
         if (chatNavLabel) chatNavLabel.textContent = 'Patient Live Chat';
+        if (topUploadBtn) topUploadBtn.style.display = 'none';
+        if (rxUploadNewBtn) rxUploadNewBtn.style.display = 'none';
+        if (chatAttachBtn) chatAttachBtn.style.display = 'none';
     } else if (user.role === 'ADMIN') {
         if (dashTabBtn) dashTabBtn.style.display = 'none';
+        if (rxTabBtn) rxTabBtn.style.display = 'none';
         if (settingsTabBtn) settingsTabBtn.style.display = 'flex';
         if (stockTabBtn) stockTabBtn.style.display = 'flex';
         if (verifyTabBtn) verifyTabBtn.style.display = 'flex';
         if (adminTabBtn) adminTabBtn.style.display = 'flex';
         if (remTabBtn) remTabBtn.style.display = 'none';
         if (chatNavLabel) chatNavLabel.textContent = 'Live Consultations';
+        if (topUploadBtn) topUploadBtn.style.display = 'none';
+        if (rxUploadNewBtn) rxUploadNewBtn.style.display = 'none';
+        if (chatAttachBtn) chatAttachBtn.style.display = 'none';
         setTimeout(() => {
             switchTab('admin');
             loadAdminData();
@@ -1554,7 +1599,10 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
     if (helpInitial) helpInitial.textContent = (user.name || 'P').trim().charAt(0).toUpperCase();
 
     const supportAvatar = document.getElementById('support-avatar-img');
-    if (supportAvatar) supportAvatar.src = (user.customAvatar || avatarAssets.photo);
+    if (supportAvatar) {
+        const supSrc = (user.customAvatar && !user.customAvatar.includes('images.unsplash.com')) ? user.customAvatar : avatarAssets.photo;
+        supportAvatar.src = supSrc;
+    }
 
     // Refresh prescriptions and notifications
     loadPrescriptions();
@@ -1608,15 +1656,31 @@ function syncProfileSettingsFields(user) {
     if (phoneInput) phoneInput.value = user.phone || '';
     if (cardName) cardName.textContent = user.name || firstName || 'User Profile';
     if (cardId) cardId.textContent = `Patient ID: ${formattedId}`;
-    
+
     // Use custom uploaded photo or automatically gender-matched photo
     if (avatarImg) {
-        avatarImg.src = (user && user.customAvatar) ? user.customAvatar : avatarAssets.photo;
+        let currentPhoto = (user && user.customAvatar) ? user.customAvatar : avatarAssets.photo;
+        if (currentPhoto && currentPhoto.includes('images.unsplash.com')) {
+            currentPhoto = avatarAssets.photo;
+        }
+        avatarImg.src = currentPhoto;
     }
 
-    // Auto-select gender dropdown
+    // Auto-select gender dropdown and bind live avatar preview
     if (genderSelect) {
         genderSelect.value = user.gender ? user.gender : (avatarAssets.gender === 'FEMALE' ? 'Female' : 'Male');
+
+        if (!genderSelect.dataset.avatarSyncBound) {
+            genderSelect.dataset.avatarSyncBound = 'true';
+            genderSelect.addEventListener('change', (e) => {
+                const selectedGender = e.target.value;
+                const isCustomFile = state.currentUser?.customAvatar && state.currentUser.customAvatar.startsWith('data:');
+                if (!isCustomFile) {
+                    const newAssets = getUserAvatarAssets(state.currentUser?.name, selectedGender, state.currentUser?.role);
+                    if (avatarImg) avatarImg.src = newAssets.photo;
+                }
+            });
+        }
     }
 
     // Restore emergency contacts if user has saved any
@@ -1746,7 +1810,10 @@ async function saveProfileSettings() {
     const chronicConditions = Array.from(conditionPills).map(p => p.textContent.trim()).filter(t => t !== 'None reported').join(', ');
 
     const userId = state.currentUser ? state.currentUser.id : null;
-    const customAvatar = state.currentUser ? state.currentUser.customAvatar : null;
+    let customAvatar = state.currentUser ? state.currentUser.customAvatar : null;
+    if (customAvatar && customAvatar.includes('images.unsplash.com')) {
+        customAvatar = null;
+    }
 
     try {
         const payload = {
@@ -1783,8 +1850,10 @@ async function saveProfileSettings() {
                 allergies: data.allergies !== undefined ? data.allergies : allergies,
                 chronicConditions: data.chronicConditions !== undefined ? data.chronicConditions : chronicConditions
             };
-            if (data.customAvatar) {
+            if (data.customAvatar && !data.customAvatar.includes('images.unsplash.com')) {
                 state.currentUser.customAvatar = data.customAvatar;
+            } else {
+                delete state.currentUser.customAvatar;
             }
 
             sessionStorage.setItem('medilink_user', JSON.stringify(state.currentUser));
@@ -1850,7 +1919,7 @@ function handlePatientPhotoUpload(event) {
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const dataUrl = e.target.result;
         const img = document.getElementById('settings-avatar-img');
         if (img) {
@@ -1886,7 +1955,7 @@ function handlePatientPhotoUpload(event) {
 function openEditMedicalIdModal() {
     // Read current values from the UI
     const currentBlood = (document.getElementById('pill-blood-type') && document.getElementById('pill-blood-type').textContent.trim() !== 'Not specified') ? document.getElementById('pill-blood-type').textContent.trim() : 'O Positive';
-    
+
     const allergyPills = document.querySelectorAll('#allergies-pills-container .pill-allergy');
     const currentAllergies = Array.from(allergyPills).map(p => p.textContent.trim()).filter(t => t !== 'None reported').join(', ');
 
@@ -2037,6 +2106,12 @@ function handleUserLogout() {
     localStorage.removeItem('medilink_user');
     state.isAuthenticated = false;
     state.currentUser = null;
+
+    const appView = document.getElementById('view-app');
+    if (appView) {
+        appView.removeAttribute('data-portal-role');
+    }
+    document.body.removeAttribute('data-portal-role');
 
     // Reset Landing Header UI
     const guestBtns = document.getElementById('nav-guest-buttons');
@@ -2255,6 +2330,20 @@ function changeUserRole(role) {
 
 // App Tab Switcher
 function switchTab(tabId) {
+    const role = (state.currentUser?.role || state.activeRole || '').toUpperCase();
+    const isPharmacyOrAdmin = role === 'PHARMACIST' || role === 'ADMIN';
+
+    // Prevent Pharmacy Portal and Admin Portal from navigating to upload-rx
+    if (tabId === 'upload-rx' && isPharmacyOrAdmin) {
+        showToast('Prescription uploading is only available for Patient accounts.');
+        if (role === 'PHARMACIST') {
+            switchTab('stock');
+        } else {
+            switchTab('admin');
+        }
+        return;
+    }
+
     document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.sidebar-footer-link').forEach(el => el.classList.remove('active'));
@@ -2265,13 +2354,14 @@ function switchTab(tabId) {
     if (targetTab) targetTab.classList.add('active');
     if (targetBtn) targetBtn.classList.add('active');
 
-    // Hide top navbar "Upload Prescription" button when inside Medical Records or Upload Rx
+    // Hide top navbar "Upload Prescription" button when inside Medical Records or Upload Rx,
+    // and ALWAYS hide it in Pharmacy Portal or Admin Portal.
     const topUploadBtn = document.querySelector('.btn-top-upload');
     if (topUploadBtn) {
-        if (tabId === 'prescriptions' || tabId === 'upload-rx') {
+        if (isPharmacyOrAdmin || tabId === 'prescriptions' || tabId === 'upload-rx') {
             topUploadBtn.style.display = 'none';
         } else {
-            topUploadBtn.style.display = 'block';
+            topUploadBtn.style.display = 'inline-block';
         }
     }
 
@@ -2316,7 +2406,63 @@ function initRealTimeStream() {
                 const time = new Date().toLocaleTimeString();
                 const item = document.createElement('div');
                 item.className = 'ticker-item';
-                item.textContent = `[${time}] ${raw}`;
+
+                // Determine category and visual pill tag
+                let categoryClass = 'ticker-connected';
+                let tagClass = 'ticker-tag-connected';
+                let tagText = 'SYSTEM';
+
+                if (raw.includes('STOCK_UPDATE')) {
+                    categoryClass = 'ticker-stock';
+                    tagClass = 'ticker-tag-stock';
+                    tagText = 'STOCK UPDATE';
+                } else if (raw.includes('PRESCRIPTION_')) {
+                    categoryClass = 'ticker-rx';
+                    tagClass = 'ticker-tag-rx';
+                    tagText = 'PRESCRIPTION';
+                } else if (raw.includes('PRICE_UPDATE')) {
+                    categoryClass = 'ticker-price';
+                    tagClass = 'ticker-tag-price';
+                    tagText = 'PRICE UPDATE';
+                } else if (raw.includes('ALERT') || raw.includes('ALARM')) {
+                    categoryClass = 'ticker-alert';
+                    tagClass = 'ticker-tag-alert';
+                    tagText = 'ALARM ALERT';
+                } else if (raw.includes('NEW_SUPPORT_ISSUE')) {
+                    categoryClass = 'ticker-alert';
+                    tagClass = 'ticker-tag-alert';
+                    tagText = 'SUPPORT TICKET';
+                } else if (raw.includes('SYSTEM_CONNECTED')) {
+                    categoryClass = 'ticker-connected';
+                    tagClass = 'ticker-tag-connected';
+                    tagText = 'CONNECTED';
+                }
+
+                item.classList.add(categoryClass);
+
+                // Extract tag and message cleanly
+                let displayMsg = raw;
+                const match = raw.match(/^(\[[A-Za-z0-9_ -]+\]|[A-Za-z0-9_ -]+:)\s*([\s\S]*)$/);
+                if (match) {
+                    const extractedTag = match[1].replace(/[\[\]:]/g, '').trim();
+                    if (extractedTag) {
+                        tagText = extractedTag.replace(/_/g, ' ');
+                    }
+                    displayMsg = match[2].trim() || raw;
+                }
+
+                item.innerHTML = `
+                    <div class="ticker-header-row">
+                        <span class="ticker-time">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:3px;">
+                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            ${time}
+                        </span>
+                        <span class="ticker-tag ${tagClass}">${typeof escapeHtml === 'function' ? escapeHtml(tagText) : tagText}</span>
+                    </div>
+                    <div class="ticker-msg">${typeof escapeHtml === 'function' ? escapeHtml(displayMsg) : displayMsg}</div>
+                `;
                 tickerBox.insertBefore(item, tickerBox.firstChild);
             }
 
@@ -2326,6 +2472,29 @@ function initRealTimeStream() {
                     icon: '⏰',
                     title: 'Medicine Dose Alarm',
                     text: raw.trim(),
+                    time: 'Just now'
+                });
+            } else if (raw.includes('NEW_SUPPORT_ISSUE')) {
+                // If admin portal is open, refresh or increment badge
+                const adminBadge = document.getElementById('admin-nav-issues-badge');
+                if (adminBadge) {
+                    let cur = parseInt(adminBadge.textContent || '0', 10);
+                    cur = isNaN(cur) ? 1 : cur + 1;
+                    adminBadge.textContent = cur;
+                    adminBadge.style.display = 'inline-block';
+                }
+                const cleanMsg = raw.replace('NEW_SUPPORT_ISSUE:', '').trim();
+                showToast(`🔔 ${cleanMsg}`, 'info');
+                const activePanel = document.getElementById('admin-subpanel-support-issues');
+                if (activePanel && activePanel.classList.contains('active')) {
+                    if (typeof loadAdminSupportIssues === 'function') {
+                        loadAdminSupportIssues();
+                    }
+                }
+                addNotification({
+                    icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+                    title: 'New Support Ticket',
+                    text: cleanMsg,
                     time: 'Just now'
                 });
             } else if (raw.includes('STOCK_UPDATE') || raw.includes('PRESCRIPTION_') || raw.includes('ADMIN_BROADCAST') || raw.includes('SYSTEM ALERT') || raw.includes('SYSTEM_ANNOUNCEMENT') || raw.includes('PRICE_UPDATE')) {
@@ -2777,7 +2946,10 @@ function renderPrescriptions(list) {
     if (!container) return;
 
     if (!list || list.length === 0) {
-        container.innerHTML = '<p class="text-muted">No prescriptions recorded. Click "Upload Prescription" to add one.</p>';
+        const isPatient = (state.currentUser?.role || state.activeRole || 'PATIENT').toUpperCase() === 'PATIENT';
+        container.innerHTML = isPatient
+            ? '<p class="text-muted">No prescriptions recorded. Click "Upload Prescription" to add one.</p>'
+            : '<p class="text-muted">No prescriptions recorded.</p>';
         return;
     }
 
@@ -2824,10 +2996,10 @@ function renderPrescriptions(list) {
             <h4 style="margin: 14px 0 8px; font-weight: 800; color: var(--text-heading);">Prescribed Medications & Intake Schedule:</h4>
             <div class="rx-medications-sections-list">
                 ${rx.items && rx.items.length > 0 ? rx.items.map((item, idx) => {
-                    const takenTimeDisplay = formatMedicineTakenTimeDisplay(item);
-                    const mealRelation = extractMealRelation(item);
-                    const cleanNote = extractClinicalNotes(item.instructions);
-                    return `
+        const takenTimeDisplay = formatMedicineTakenTimeDisplay(item);
+        const mealRelation = extractMealRelation(item);
+        const cleanNote = extractClinicalNotes(item.instructions);
+        return `
                     <div class="rx-history-med-card">
                         <div class="rx-history-med-header">
                             <div class="rx-med-name-wrap">
@@ -2840,6 +3012,15 @@ function renderPrescriptions(list) {
                                 ${item.dosage ? `<span class="rx-history-dosage-pill">${escapeHtml(item.dosage)}</span>` : ''}
                                 ${item.genericName ? `<span class="rx-history-generic">(${escapeHtml(item.genericName)})</span>` : ''}
                             </div>
+                            <button type="button" class="btn-rx-set-reminder" onclick="openReminderForHistoryMed('${escapeHtml(rx.id)}', ${idx})" title="Schedule Dose Reminder for this medicine">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="13" r="8"/>
+                                    <path d="M12 9v4l2 2"/>
+                                    <path d="M5 3 2 6"/>
+                                    <path d="m22 6-3-3"/>
+                                </svg>
+                                <span>Set Reminder</span>
+                            </button>
                         </div>
 
                         <!-- Dedicated Medicine Taken Time Section -->
@@ -2864,7 +3045,7 @@ function renderPrescriptions(list) {
                         </div>` : ''}
                     </div>
                     `;
-                }).join('') : '<p class="text-muted" style="font-size:0.86rem; padding:8px 0;">No individual dosage items extracted.</p>'}
+    }).join('') : '<p class="text-muted" style="font-size:0.86rem; padding:8px 0;">No individual dosage items extracted.</p>'}
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 14px;">
@@ -3258,7 +3439,7 @@ function playCheckSound() {
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.4);
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function playAlarmSoundLoop() {
@@ -3267,7 +3448,7 @@ function playAlarmSoundLoop() {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (!AudioContext) return;
         const ctx = new AudioContext();
-        
+
         const playBeep = () => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -3281,10 +3462,10 @@ function playAlarmSoundLoop() {
             osc.start();
             osc.stop(ctx.currentTime + 0.3);
         };
-        
+
         playBeep();
         activeAlarmLoopTimer = setInterval(playBeep, 1200);
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function stopAlarmSoundLoop() {
@@ -3568,58 +3749,343 @@ async function handleSyncFromPrescriptions() {
     }
 }
 
-function populatePrescriptionPicker() {
-    const picker = document.getElementById('rem-prescription-picker');
-    if (!picker) return;
+function normalizePrescriptionMedicine(item, sourceLabel, rxId, itemIndex) {
+    if (!item) return null;
+    const name = item.medicineName || item.name || 'Medication';
+    const strength = item.strength || '';
+    const dosage = item.dosage || (item.dosageAmount ? `${item.dosageAmount} ${item.dosageUnit || ''}`.trim() : (strength || '1 Dose'));
 
-    // Collect medicines from state.medicines and state.prescriptions
-    const meds = [];
-    if (state.medicines && Array.isArray(state.medicines)) {
-        state.medicines.forEach(m => {
-            if (m.name && !meds.some(x => x.name === m.name)) {
-                meds.push({ name: m.name, dosage: m.dosage || '1 Tablet', timing: 'AFTER_MEAL', instr: m.category || 'Prescribed Medication' });
+    // Determine Scheduled Time
+    let scheduledTime = '08:00';
+    const rawExact = item.exactTimes ? (Array.isArray(item.exactTimes) ? item.exactTimes.join(' ') : String(item.exactTimes)) : '';
+    const rawTiming = item.timing ? (Array.isArray(item.timing) ? item.timing.join(' ') : String(item.timing)) : '';
+    const rawFreq = item.frequency || '';
+    const rawMeal = item.mealRelation || '';
+    const rawInstr = item.instructions || item.instr || '';
+    const rawTakenTime = item.takenTime || '';
+    const combined = `${rawExact} ${rawTiming} ${rawFreq} ${rawMeal} ${rawInstr} ${rawTakenTime}`.toLowerCase();
+
+    // 1. Try parsing exact time if available like "08:00 AM", "14:00", "8:30pm"
+    const timeMatch = rawExact.match(/(\d{1,2})[:.](\d{2})\s*(am|pm)?/i) || combined.match(/(\d{1,2})[:.](\d{2})\s*(am|pm)/i);
+    if (timeMatch) {
+        let h = parseInt(timeMatch[1], 10);
+        const m = timeMatch[2];
+        const ampm = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
+        if (ampm === 'pm' && h < 12) h += 12;
+        if (ampm === 'am' && h === 12) h = 0;
+        scheduledTime = `${String(h).padStart(2, '0')}:${m}`;
+    } else if (combined.includes('morning') || combined.includes('breakfast') || combined.includes('empty stomach') || combined.includes('1+1+1') || combined.includes('1+0+1')) {
+        scheduledTime = '08:00';
+    } else if (combined.includes('afternoon') || combined.includes('lunch') || combined.includes('noon') || combined.includes('0+1+0')) {
+        scheduledTime = '13:00';
+    } else if (combined.includes('evening') || combined.includes('sunset')) {
+        scheduledTime = '18:30';
+    } else if (combined.includes('night') || combined.includes('bedtime') || combined.includes('dinner') || combined.includes('hs') || combined.includes('0+0+1')) {
+        scheduledTime = '21:00';
+    } else if (combined.includes('stat') || combined.includes('immediate')) {
+        const now = new Date();
+        scheduledTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // 2. Determine Meal Relation (Specific meal relation tags take precedence over generic timing)
+    let mealTiming = 'AFTER_MEAL';
+    if (combined.includes('empty stomach')) {
+        mealTiming = 'EMPTY_STOMACH';
+    } else if (combined.includes('before meal') || combined.includes('before food') || combined.includes('before breakfast') || combined.includes('ac')) {
+        mealTiming = 'BEFORE_MEAL';
+    } else if (combined.includes('after meal') || combined.includes('after food') || combined.includes('pc')) {
+        mealTiming = 'AFTER_MEAL';
+    } else if (combined.includes('with meal') || combined.includes('with food')) {
+        mealTiming = 'WITH_MEAL';
+    } else if (combined.includes('bedtime') || combined.includes('before sleep') || combined.includes('hs') || (combined.includes('night') && !combined.includes('morning') && !combined.includes('afternoon'))) {
+        mealTiming = 'BEDTIME';
+    }
+
+    // 3. Determine Frequency
+    let frequency = 'DAILY';
+    if (combined.includes('1+1+1') || combined.includes('3 times') || combined.includes('three times') || combined.includes('tid')) {
+        frequency = 'THREE_TIMES';
+    } else if (combined.includes('1+0+1') || combined.includes('2 times') || combined.includes('twice') || combined.includes('bid') || combined.includes('bd')) {
+        frequency = 'TWICE_DAILY';
+    } else if (combined.includes('weekly') || combined.includes('once a week')) {
+        frequency = 'WEEKLY';
+    } else if (combined.includes('sos') || combined.includes('as needed') || combined.includes('prn')) {
+        frequency = 'AS_NEEDED';
+    } else {
+        frequency = 'DAILY';
+    }
+
+    // 4. Instructions Note
+    let cleanNotes = rawInstr;
+    if (cleanNotes) {
+        cleanNotes = cleanNotes.replace(/Taken Time:[^|]*/gi, '')
+            .replace(/Time:[^|]*/gi, '')
+            .replace(/Meal:[^|]*/gi, '')
+            .replace(/Note:\s*/gi, '')
+            .replace(/^[|\s]+|[|\s]+$/g, '')
+            .trim();
+    }
+    if (!cleanNotes || cleanNotes.toLowerCase().includes('uncertain')) {
+        if (mealTiming === 'BEFORE_MEAL') cleanNotes = 'Take 30 mins before meal with water';
+        else if (mealTiming === 'EMPTY_STOMACH') cleanNotes = 'Take on empty stomach with water';
+        else if (mealTiming === 'BEDTIME') cleanNotes = 'Take at bedtime with water';
+        else if (mealTiming === 'WITH_MEAL') cleanNotes = 'Take with food/meal';
+        else cleanNotes = 'Take after meal with a full glass of water';
+    }
+
+    const uniqueId = `rxmed_${String(rxId || 'scan').replace(/[^a-zA-Z0-9_]/g, '_')}_${itemIndex || 0}`;
+
+    return {
+        id: uniqueId,
+        name: name,
+        strength: strength,
+        dosage: dosage,
+        time: scheduledTime,
+        mealTiming: mealTiming,
+        frequency: frequency,
+        instructions: cleanNotes,
+        sourceLabel: sourceLabel || 'Active Prescription',
+        rxId: rxId,
+        rawItem: item
+    };
+}
+
+function getAllActivePrescriptionMedicines() {
+    const list = [];
+    const seenKeys = new Set();
+
+    // 1. Medicines from current Prescription Scanner scan / staged data
+    const scannedItems = (state.stagedRxData && state.stagedRxData.items && state.stagedRxData.items.length > 0)
+        ? state.stagedRxData.items
+        : (state.lastScannedMedicines && state.lastScannedMedicines.length > 0 ? state.lastScannedMedicines : []);
+
+    if (scannedItems && scannedItems.length > 0) {
+        scannedItems.forEach((item, idx) => {
+            const norm = normalizePrescriptionMedicine(item, 'Scanned Prescription (Active)', 'scan', idx);
+            if (norm && norm.name) {
+                const key = `${norm.name.toLowerCase()}_${norm.dosage.toLowerCase()}`;
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    list.push(norm);
+                }
             }
         });
     }
 
-    if (meds.length === 0) {
-        meds.push(
-            { name: 'Napa Extra 500mg', dosage: '1 Tablet', timing: 'AFTER_MEAL', instr: 'Take after meal with water' },
-            { name: 'Seclo 20mg', dosage: '1 Capsule', timing: 'BEFORE_MEAL', instr: 'Take 30 mins before breakfast' },
-            { name: 'Monas 10mg', dosage: '1 Tablet', timing: 'BEDTIME', instr: 'Take at bedtime for asthma/allergies' },
-            { name: 'Fexo 120mg', dosage: '1 Tablet', timing: 'BEDTIME', instr: 'Take at bedtime for allergy relief' },
-            { name: 'Lisinopril 10mg', dosage: '1 Tablet', timing: 'AFTER_MEAL', instr: 'Take morning blood pressure dose' }
-        );
+    // 2. Medicines from saved active Prescriptions (Medical Records)
+    if (state.prescriptions && Array.isArray(state.prescriptions)) {
+        state.prescriptions.forEach(rx => {
+            if (rx.items && Array.isArray(rx.items)) {
+                rx.items.forEach((item, idx) => {
+                    const docTag = rx.doctorName ? `Dr. ${rx.doctorName.replace(/^dr\.?\s*/i, '')}` : (rx.id ? `Rx #${rx.id}` : 'Prescription');
+                    const norm = normalizePrescriptionMedicine(item, docTag, rx.id || 'rx', idx);
+                    if (norm && norm.name) {
+                        const key = `${norm.name.toLowerCase()}_${norm.dosage.toLowerCase()}`;
+                        if (!seenKeys.has(key)) {
+                            seenKeys.add(key);
+                            list.push(norm);
+                        }
+                    }
+                });
+            }
+        });
     }
 
-    picker.innerHTML = `
-        <option value="">-- Quick select from active prescriptions --</option>
-        ${meds.map((m, i) => `
-            <option value="${i}" data-name="${escapeHtml(m.name)}" data-dosage="${escapeHtml(m.dosage)}" data-timing="${escapeHtml(m.timing)}" data-instr="${escapeHtml(m.instr)}">
-                ${escapeHtml(m.name)} (${escapeHtml(m.dosage)})
+    // 3. Fallback: Pharmacy catalog if no prescriptions exist yet
+    if (list.length === 0 && state.medicines && Array.isArray(state.medicines)) {
+        state.medicines.slice(0, 10).forEach((m, idx) => {
+            if (m.name) {
+                const norm = normalizePrescriptionMedicine({
+                    medicineName: m.name,
+                    dosage: m.dosage || '1 Tablet',
+                    frequency: 'Daily',
+                    instructions: m.category || 'Prescribed Medication'
+                }, 'Catalog', 'catalog', idx);
+                if (norm) list.push(norm);
+            }
+        });
+    }
+
+    // 4. Default clinically popular fallbacks if workspace is completely fresh
+    if (list.length === 0) {
+        const defaults = [
+            { name: 'Napa Extra', dosage: '500mg (1 Tablet)', timing: 'Morning, Afternoon, Night', freq: '1+1+1', meal: 'AFTER_MEAL', instr: 'Take after meal with water for fever or pain' },
+            { name: 'Seclo 20', dosage: '20mg (1 Capsule)', timing: 'Morning & Night', freq: '1+0+1', meal: 'BEFORE_MEAL', instr: 'Take 30 mins before breakfast' },
+            { name: 'Monas 10', dosage: '10mg (1 Tablet)', timing: 'Night', freq: '0+0+1', meal: 'BEDTIME', instr: 'Take at bedtime for allergy and asthma relief' },
+            { name: 'Fexo 120', dosage: '120mg (1 Tablet)', timing: 'Night', freq: '0+0+1', meal: 'BEDTIME', instr: 'Take once daily at night for allergy relief' },
+            { name: 'Lisinopril 10', dosage: '10mg (1 Tablet)', timing: 'Morning', freq: '1+0+0', meal: 'AFTER_MEAL', instr: 'Take morning blood pressure dose' }
+        ];
+        defaults.forEach((d, idx) => {
+            list.push(normalizePrescriptionMedicine({
+                medicineName: d.name,
+                dosage: d.dosage,
+                timing: d.timing,
+                frequency: d.freq,
+                mealRelation: d.meal,
+                instructions: d.instr
+            }, 'Standard Prescriptions', 'def', idx));
+        });
+    }
+
+    return list;
+}
+
+function applyMedToReminderForm(med) {
+    if (!med) return;
+    const nameEl = document.getElementById('rem-med-name');
+    const doseEl = document.getElementById('rem-dosage');
+    const timeEl = document.getElementById('rem-time');
+    const mealEl = document.getElementById('rem-meal-timing');
+    const freqEl = document.getElementById('rem-freq');
+    const instrEl = document.getElementById('rem-instructions');
+
+    const fieldsToAnimate = [];
+
+    if (nameEl) {
+        nameEl.value = med.name || '';
+        fieldsToAnimate.push(nameEl);
+    }
+    if (doseEl) {
+        doseEl.value = med.dosage || med.strength || '1 Tablet';
+        fieldsToAnimate.push(doseEl);
+    }
+    if (timeEl && med.time) {
+        timeEl.value = med.time;
+        fieldsToAnimate.push(timeEl);
+    }
+    if (mealEl && med.mealTiming) {
+        mealEl.value = med.mealTiming;
+        fieldsToAnimate.push(mealEl);
+    }
+    if (freqEl && med.frequency) {
+        freqEl.value = med.frequency;
+        fieldsToAnimate.push(freqEl);
+    }
+    if (instrEl) {
+        instrEl.value = med.instructions || 'Take with full glass of water';
+        fieldsToAnimate.push(instrEl);
+    }
+
+    fieldsToAnimate.forEach(el => {
+        el.classList.remove('field-autofill-highlight');
+        void el.offsetWidth; // trigger reflow
+        el.classList.add('field-autofill-highlight');
+        setTimeout(() => el.classList.remove('field-autofill-highlight'), 1200);
+    });
+}
+
+function populatePrescriptionPicker(selectedId) {
+    const picker = document.getElementById('rem-prescription-picker');
+    if (!picker) return;
+
+    const meds = getAllActivePrescriptionMedicines();
+    state.activePrescriptionMeds = meds;
+
+    let optionsHtml = `<option value="">-- Quick select from active prescriptions (${meds.length}) --</option>`;
+    meds.forEach(m => {
+        const isSelected = (selectedId && (m.id === selectedId || m.name.toLowerCase() === String(selectedId).toLowerCase())) ? 'selected' : '';
+        optionsHtml += `
+            <option value="${m.id}" data-name="${escapeHtml(m.name)}" data-dosage="${escapeHtml(m.dosage)}" data-time="${escapeHtml(m.time)}" data-meal="${escapeHtml(m.mealTiming)}" data-freq="${escapeHtml(m.frequency)}" data-instr="${escapeHtml(m.instructions)}" ${isSelected}>
+                ${escapeHtml(m.name)} ${m.dosage ? `(${escapeHtml(m.dosage)})` : ''} — [${escapeHtml(m.sourceLabel)}]
             </option>
-        `).join('')}
-    `;
+        `;
+    });
+
+    picker.innerHTML = optionsHtml;
+
+    if (selectedId) {
+        const matched = meds.find(m => m.id === selectedId || m.name.toLowerCase() === String(selectedId).toLowerCase());
+        if (matched) {
+            picker.value = matched.id;
+            applyMedToReminderForm(matched);
+        }
+    }
 }
 
 function handlePrescriptionPickerChange(selectEl) {
+    if (!selectEl) return;
+    const val = selectEl.value;
+    if (!val) return;
+
+    const meds = state.activePrescriptionMeds || getAllActivePrescriptionMedicines();
+    const found = meds.find(m => m.id === val);
+    if (found) {
+        applyMedToReminderForm(found);
+        showToast(`📋 Auto-filled reminder details for ${found.name}`);
+        return;
+    }
+
     const opt = selectEl.options[selectEl.selectedIndex];
-    if (!opt || !opt.value) return;
+    if (opt) {
+        const name = opt.getAttribute('data-name');
+        const dosage = opt.getAttribute('data-dosage');
+        const time = opt.getAttribute('data-time') || '08:00';
+        const meal = opt.getAttribute('data-meal') || 'AFTER_MEAL';
+        const freq = opt.getAttribute('data-freq') || 'DAILY';
+        const instr = opt.getAttribute('data-instr');
 
-    const name = opt.getAttribute('data-name');
-    const dosage = opt.getAttribute('data-dosage');
-    const timing = opt.getAttribute('data-timing');
-    const instr = opt.getAttribute('data-instr');
-
-    if (name) document.getElementById('rem-med-name').value = name;
-    if (dosage) document.getElementById('rem-dosage').value = dosage;
-    if (timing) document.getElementById('rem-meal-timing').value = timing;
-    if (instr) document.getElementById('rem-instructions').value = instr;
+        if (name) document.getElementById('rem-med-name').value = name;
+        if (dosage) document.getElementById('rem-dosage').value = dosage;
+        if (time) document.getElementById('rem-time').value = time;
+        if (meal) document.getElementById('rem-meal-timing').value = meal;
+        if (freq) document.getElementById('rem-freq').value = freq;
+        if (instr) document.getElementById('rem-instructions').value = instr;
+    }
 }
 
-function openReminderModal() {
-    populatePrescriptionPicker();
-    document.getElementById('modal-reminder').classList.add('active');
+async function openReminderModal(preselectMedId) {
+    if (!state.prescriptions || state.prescriptions.length === 0) {
+        try {
+            const res = await fetch('/api/prescriptions');
+            const data = await res.json();
+            state.prescriptions = data.prescriptions || [];
+        } catch (e) {
+            console.warn('Prescriptions fetch failed:', e);
+        }
+    }
+    populatePrescriptionPicker(preselectMedId);
+    const modal = document.getElementById('modal-reminder');
+    if (modal) modal.classList.add('active');
+}
+
+async function openReminderForScannedMed(idx) {
+    let list = (state.stagedRxData && state.stagedRxData.items && state.stagedRxData.items.length > 0)
+        ? state.stagedRxData.items
+        : (state.lastScannedMedicines || []);
+
+    const rawItem = list[idx];
+    if (!rawItem) {
+        showToast('Medication item not found.');
+        return;
+    }
+
+    const norm = normalizePrescriptionMedicine(rawItem, 'Scanned Prescription', 'scan', idx);
+    await openReminderModal(norm.id);
+    applyMedToReminderForm(norm);
+    showToast(`⏰ Set Dose Reminder for ${norm.name}`);
+}
+
+async function openReminderForHistoryMed(rxId, idx) {
+    if (!state.prescriptions || state.prescriptions.length === 0) {
+        try {
+            const res = await fetch('/api/prescriptions');
+            const data = await res.json();
+            state.prescriptions = data.prescriptions || [];
+        } catch (e) { }
+    }
+
+    const rx = (state.prescriptions || []).find(r => String(r.id) === String(rxId));
+    if (!rx || !rx.items || !rx.items[idx]) {
+        showToast('Prescription record not found.');
+        return;
+    }
+
+    const rawItem = rx.items[idx];
+    const docTag = rx.doctorName ? `Dr. ${rx.doctorName.replace(/^dr\.?\s*/i, '')}` : (rx.id ? `Rx #${rx.id}` : 'Prescription');
+    const norm = normalizePrescriptionMedicine(rawItem, docTag, rx.id, idx);
+    await openReminderModal(norm.id);
+    applyMedToReminderForm(norm);
+    showToast(`⏰ Set Dose Reminder for ${norm.name}`);
 }
 
 async function submitNewReminder() {
@@ -3670,7 +4136,7 @@ async function triggerTestAlarm() {
         // Open modal immediately on client with audible alarm
         openAlarmModal('DEMO NOTIFICATION: Time to take your scheduled dose of Napa Extra 500mg (1 Tablet) - Take after lunch with water!');
         // Broadcast over backend SSE stream as well
-        fetch('/api/reminders/test-alert', { method: 'POST' }).catch(() => {});
+        fetch('/api/reminders/test-alert', { method: 'POST' }).catch(() => { });
     } catch (e) {
         showToast('Error triggering instant alarm.');
     }
@@ -3772,7 +4238,7 @@ function playChatNotificationSound() {
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.36);
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function updateChatNavBadge(totalUnread) {
@@ -3874,7 +4340,7 @@ function renderConversationsSidebar() {
                 if (!isNaN(d.getTime())) {
                     timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return `
@@ -3940,7 +4406,7 @@ function selectConversation(partnerId, partnerName, partnerRole, partnerEmail, p
             const totalUnread = state.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
             updateChatNavBadge(totalUnread);
         }
-    }).catch(() => {});
+    }).catch(() => { });
 
     const input = document.getElementById('chat-input');
     if (input) input.value = '';
@@ -4187,7 +4653,7 @@ function renderChatMessages(list) {
                 if (!isNaN(d.getTime())) {
                     timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         let rxCardHtml = '';
@@ -4558,7 +5024,7 @@ function openHelpArticle(title) {
 
 function filterHelpArticles(query) {
     const q = (query || '').toLowerCase().trim();
-    
+
     // Filter cards
     document.querySelectorAll('.help-cat-card').forEach(card => {
         const text = card.textContent.toLowerCase();
@@ -4584,7 +5050,7 @@ function openHelpEmailModal() {
     openModal('modal-help-email');
 }
 
-function submitHelpEmail() {
+async function submitHelpEmail() {
     const subject = document.getElementById('help-email-subject').value.trim();
     const msg = document.getElementById('help-email-message').value.trim();
 
@@ -4593,10 +5059,37 @@ function submitHelpEmail() {
         return;
     }
 
-    closeModal('modal-help-email');
-    showToast(`✅ Support ticket #${Math.floor(100000 + Math.random() * 900000)} created! We will reply to ${state.currentUser.email} within 1-2 hours.`);
-    document.getElementById('help-email-subject').value = '';
-    document.getElementById('help-email-message').value = '';
+    try {
+        const payload = {
+            category: 'General Inquiry',
+            severity: 'Medium',
+            subject: subject,
+            description: msg,
+            userId: state.currentUser ? state.currentUser.id : 'usr_guest',
+            userName: state.currentUser ? state.currentUser.name : 'MediLink User',
+            userEmail: state.currentUser ? state.currentUser.email : '',
+            userRole: state.currentUser ? state.currentUser.role : 'PATIENT'
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/support/issues`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        closeModal('modal-help-email');
+        if (res.ok) {
+            showToast(`✅ Support ticket #${data.ticketId} created! We will reply to ${state.currentUser.email} shortly.`, 'success');
+            document.getElementById('help-email-subject').value = '';
+            document.getElementById('help-email-message').value = '';
+            loadMySupportIssues();
+        } else {
+            showToast(`Failed to submit: ${data.message || 'Server error'}`);
+        }
+    } catch (e) {
+        showToast('Failed to submit ticket: ' + e.message);
+    }
 }
 
 // Support Center Subview Controller
@@ -4616,6 +5109,7 @@ function switchHelpSubView(viewName) {
         if (btnGuides) btnGuides.classList.remove('active');
         if (btnSupport) btnSupport.classList.add('active');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        loadMySupportIssues();
     } else {
         if (supportView) supportView.classList.remove('active');
         if (guidesView) guidesView.classList.add('active');
@@ -4640,12 +5134,14 @@ function handleSupportAttachment(event) {
     }
 }
 
-function submitSupportReport() {
+async function submitSupportReport() {
     const category = document.getElementById('support-category').value;
     const severityEl = document.querySelector('input[name="severity"]:checked');
     const severity = severityEl ? severityEl.value : 'Medium';
     const subject = document.getElementById('support-subject').value.trim();
     const description = document.getElementById('support-description').value.trim();
+    const attachInput = document.getElementById('support-attach-file');
+    const attachmentName = (attachInput && attachInput.files && attachInput.files[0]) ? attachInput.files[0].name : '';
 
     if (!category) {
         showToast('Please select an issue category.');
@@ -4656,28 +5152,81 @@ function submitSupportReport() {
         return;
     }
 
-    const ticketId = `#SR-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    // Add to recent reports list
-    const reportsList = document.getElementById('recent-reports-list');
-    if (reportsList) {
-        const newItem = document.createElement('div');
-        newItem.className = 'recent-report-item';
-        newItem.innerHTML = `
-            <div class="report-meta-row">
-                <span class="report-status-badge badge-pending">Pending</span>
-                <span class="report-date">Just now</span>
-            </div>
-            <h4 class="report-item-title">${escapeHtml(subject)}</h4>
-            <p class="report-item-snippet">${escapeHtml(description.substring(0, 85))}${description.length > 85 ? '...' : ''}</p>
-        `;
-        reportsList.insertBefore(newItem, reportsList.firstChild);
+    const submitBtn = document.querySelector('#support-issue-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting report...';
     }
 
-    // Reset form
-    resetSupportForm();
+    try {
+        const payload = {
+            category,
+            severity,
+            subject,
+            description,
+            attachmentName,
+            userId: state.currentUser ? state.currentUser.id : 'usr_guest',
+            userName: state.currentUser ? state.currentUser.name : 'MediLink User',
+            userEmail: state.currentUser ? state.currentUser.email : '',
+            userRole: state.currentUser ? state.currentUser.role : 'PATIENT'
+        };
 
-    showToast(`✅ Support report ${ticketId} submitted! Our team will review it shortly.`);
+        const res = await fetch(`${API_BASE_URL}/api/support/issues`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`✅ Support report #${data.ticketId} submitted! Admin team has been notified.`, 'success');
+            resetSupportForm();
+            loadMySupportIssues();
+        } else {
+            showToast(`Failed to submit report: ${data.message || 'Server error'}`);
+        }
+    } catch (err) {
+        console.error('Support submission error:', err);
+        showToast('Error submitting support report: ' + err.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Report';
+        }
+    }
+}
+
+async function loadMySupportIssues() {
+    const reportsList = document.getElementById('recent-reports-list');
+    if (!reportsList) return;
+
+    const userId = state.currentUser ? state.currentUser.id : '';
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/support/my-issues?userId=${encodeURIComponent(userId)}`);
+        if (res.ok) {
+            const data = await res.json();
+            const issues = data.issues || [];
+            if (issues.length === 0) {
+                reportsList.innerHTML = '<div style="padding:15px; color:#94a3b8; font-size:0.85rem; text-align:center;">No previous support tickets recorded.</div>';
+                return;
+            }
+            reportsList.innerHTML = issues.map(iss => `
+                <div class="recent-report-item">
+                    <div class="report-meta-row">
+                        <span class="report-status-badge ${iss.status === 'RESOLVED' ? 'badge-resolved' : (iss.status === 'IN_PROGRESS' ? 'badge-progress' : 'badge-pending')}">
+                            ${escapeHtml(iss.status)}
+                        </span>
+                        <span class="report-date">${iss.createdAt ? new Date(iss.createdAt).toLocaleDateString() : 'Recent'}</span>
+                    </div>
+                    <h4 class="report-item-title">${escapeHtml(iss.subject)} <small style="color:#64748b; font-size:0.75rem;">(${escapeHtml(iss.id)})</small></h4>
+                    <p class="report-item-snippet">${escapeHtml(iss.description ? iss.description.substring(0, 95) : '')}${iss.description && iss.description.length > 95 ? '...' : ''}</p>
+                    ${iss.adminNotes ? `<div style="font-size:0.76rem; color:#10b981; margin-top:5px; background:rgba(16,185,129,0.08); padding:4px 8px; border-radius:4px;"><strong>Admin note:</strong> ${escapeHtml(iss.adminNotes)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        console.warn('Could not load user support issues:', e);
+    }
 }
 
 function resetSupportForm() {
@@ -4727,7 +5276,7 @@ function toggleNotificationDropdown(event, source) {
     if (source === 'support') menuId = 'notification-dropdown-menu-support';
 
     const targetMenu = document.getElementById(menuId);
-    
+
     // Close other dropdowns
     document.querySelectorAll('.notification-dropdown-menu').forEach(m => {
         if (m !== targetMenu) m.classList.remove('active');
@@ -4981,7 +5530,7 @@ function handleSelectedRxFile(file) {
     stagedRxFile = file;
 
     const reader = new FileReader();
-    reader.onload = function(evt) {
+    reader.onload = function (evt) {
         const previewImg = document.getElementById('rx-preview-img');
         const previewContainer = document.getElementById('rx-preview-container');
         const dropzoneInner = document.getElementById('rx-dropzone-inner');
@@ -5135,6 +5684,7 @@ function renderScannedPrescriptionResult(data) {
     if (resultsPanel) resultsPanel.style.display = 'block';
 
     const meds = data.medicines || [];
+    state.lastScannedMedicines = meds;
 
     // 1. Verification status banner
     const banner = document.getElementById('rx-verification-banner');
@@ -5179,9 +5729,9 @@ function renderScannedPrescriptionResult(data) {
     let extractedPatientName = data.patientName || '';
     if (extractedPatientName && !isUncertainVal(extractedPatientName)) {
         extractedPatientName = extractedPatientName.replace(/\s*\(\s*\d+.*?\)/g, '')
-                                                   .replace(/\s*\(\s*[MFmf]\b.*?\)/g, '')
-                                                   .replace(/\s*\bAge\s*:\s*\d+.*/gi, '')
-                                                   .trim();
+            .replace(/\s*\(\s*[MFmf]\b.*?\)/g, '')
+            .replace(/\s*\bAge\s*:\s*\d+.*/gi, '')
+            .trim();
     }
 
     const patientElem = document.getElementById('rx-info-patient');
@@ -5335,7 +5885,18 @@ function renderScannedPrescriptionResult(data) {
                                 <span class="rx-med-title">${escapeHtml(item.medicineName || 'Medication')}</span>
                                 ${item.strength && !isUncertainVal(item.strength) ? `<span class="rx-med-strength-badge">${escapeHtml(item.strength)}</span>` : ''}
                             </div>
-                            <span class="rx-verified-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Extracted</span>
+                            <div class="rx-card-actions-wrap" style="display:flex; align-items:center; gap:8px;">
+                                <span class="rx-verified-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Extracted</span>
+                                <button type="button" class="btn-rx-set-reminder" onclick="openReminderForScannedMed(${idx})" title="Schedule Dose Reminder for this medicine">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="13" r="8"/>
+                                        <path d="M12 9v4l2 2"/>
+                                        <path d="M5 3 2 6"/>
+                                        <path d="m22 6-3-3"/>
+                                    </svg>
+                                    <span>Set Reminder</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Dedicated Medicine Taken Time Section -->
@@ -5480,7 +6041,7 @@ async function extractPrescriptionWithOCR(file) {
 
 function parseMedicalEntitiesFromText(rawText, fileName) {
     const combined = (rawText + ' ' + fileName).toLowerCase();
-    
+
     // Check if filename is explicitly a non-medical item
     if (!checkIsPrescription(fileName) && rawText.length < 20) {
         return { isValid: false, items: [], doctor: '', hospital: '', rawText: '' };
@@ -5637,7 +6198,7 @@ async function confirmAndAddRxToHistory() {
         if (data.status === 'SUCCESS') {
             clearVoiceRecording('page');
             showToast('✅ Prescription saved to Medical Records & Active Count updated!');
-            
+
             // Add notification
             addNotification({
                 icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>',
@@ -5791,9 +6352,9 @@ function openGeminiKeyModal() {
 }
 
 function saveGeminiApiKey() {
-    const input    = document.getElementById('gemini-api-key-input');
+    const input = document.getElementById('gemini-api-key-input');
     const statusEl = document.getElementById('gemini-status-text');
-    const rawKey   = input ? input.value.trim() : '';
+    const rawKey = input ? input.value.trim() : '';
 
     // Clearing the key
     if (!rawKey) {
@@ -5824,7 +6385,7 @@ function saveGeminiApiKey() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: rawKey })
-    }).catch(() => {});
+    }).catch(() => { });
 
     updateGeminiStatusBadge();
     showToast('✅ API Key saved! Send a message to test the connection 🚀');
@@ -5942,7 +6503,7 @@ function setAiTypingVisible(visible) {
 function saveAiChatHistory() {
     try {
         sessionStorage.setItem('medilink_ai_chat_history', JSON.stringify(aiChatState.history.slice(-20)));
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function renderAllAiMessages() {
@@ -6050,7 +6611,7 @@ function initTheme() {
     // 1. Check stored preference or system preference
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
     const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
+
     let activeTheme = 'light';
     if (storedTheme === 'dark' || (!storedTheme && systemDark)) {
         activeTheme = 'dark';
@@ -6168,16 +6729,56 @@ function updateThemeOptionCards(activeOption) {
 
 
 // ============================================================================
-// ADMIN MASTER CONTROL CENTER & TELEMETRY CONTROLLER
+// MEDILINK 2.0 - MASTER ADMIN PORTAL CONTROLLER (11 COMPREHENSIVE SECTIONS)
 // ============================================================================
 
 let adminUsersList = [];
 let adminPharmaciesList = [];
 let adminMedicinesList = [];
 let adminPrescriptionsList = [];
-let adminAuditLogs = [];
+let adminComplianceQueue = [];
+let adminPharmacistsList = [];
+let adminAuditLogsList = [];
+let adminReportsData = null;
 
-// Admin Subpanel Switcher
+// Dedicated Authenticated Fetch Helper for Admin API
+function getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    let user = state.currentUser;
+    if (!user || !user.role) {
+        try {
+            const raw = localStorage.getItem('medilink_user') || sessionStorage.getItem('medilink_user');
+            if (raw) user = JSON.parse(raw);
+        } catch (e) {}
+    }
+    const role = (user && user.role) ? user.role.toUpperCase() : 'ADMIN';
+    const userId = (user && user.id) ? user.id : 'usr_admin_01';
+
+    headers['X-User-Role'] = role;
+    headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function adminFetch(url, options = {}) {
+    const opts = { ...options };
+    opts.headers = getAuthHeaders(opts.headers || {});
+    if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+        showToast('Unauthorized: Please authenticate as an Administrator.', 'error');
+        throw new Error('Unauthorized');
+    }
+    if (res.status === 403) {
+        showToast('Forbidden: Administrative privileges required.', 'error');
+        throw new Error('Forbidden');
+    }
+    return res;
+}
+
+// Admin Subpanel Switcher (11 Sections)
 function switchAdminSubTab(subTabName) {
     document.querySelectorAll('.admin-nav-tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.admin-subpanel').forEach(p => {
@@ -6194,24 +6795,39 @@ function switchAdminSubTab(subTabName) {
         activePanel.style.display = 'block';
     }
 
-    if (subTabName === 'users' && adminUsersList.length === 0) {
+    if (subTabName === 'dashboard') {
+        loadAdminData();
+    } else if (subTabName === 'users') {
         loadAdminUsers();
-    } else if (subTabName === 'pharmacies' && adminPharmaciesList.length === 0) {
-        loadAdminPharmacies();
-    } else if (subTabName === 'medicines' && adminMedicinesList.length === 0) {
+    } else if (subTabName === 'medicines') {
         loadAdminMedicines();
-    } else if (subTabName === 'prescriptions' && adminPrescriptionsList.length === 0) {
+    } else if (subTabName === 'pharmacies') {
+        loadAdminPharmacies();
+    } else if (subTabName === 'prescriptions') {
         loadAdminPrescriptions();
+        loadAdminComplianceQueue();
     } else if (subTabName === 'market') {
         loadMarketPriceData();
         loadMarketPriceHistory();
+    } else if (subTabName === 'pharmacists') {
+        loadAdminPharmacists();
+    } else if (subTabName === 'reports') {
+        loadAdminReports();
+    } else if (subTabName === 'audit-logs') {
+        loadAdminAuditLogs();
+    } else if (subTabName === 'broadcast') {
+        loadAdminData();
+    } else if (subTabName === 'health') {
+        loadAdminHealthDiagnostics();
+    } else if (subTabName === 'support-issues') {
+        loadAdminSupportIssues();
     }
 }
 
 // Master Admin Data Refresh
 async function loadAdminData() {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/telemetry`);
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/telemetry`);
         if (res.ok) {
             const telemetry = await res.json();
             renderAdminTelemetry(telemetry);
@@ -6219,65 +6835,135 @@ async function loadAdminData() {
     } catch (err) {
         console.warn('Telemetry load failed:', err);
     }
-    loadAdminUsers();
-    loadAdminPharmacies();
-    loadAdminMedicines();
-    loadAdminPrescriptions();
-    loadMarketPriceData();
-    loadMarketPriceHistory();
 }
 
 function renderAdminTelemetry(t) {
-    const kpiUsers = document.getElementById('admin-kpi-users');
-    const kpiUsersBreakdown = document.getElementById('admin-kpi-users-breakdown');
-    const kpiMeds = document.getElementById('admin-kpi-medicines');
-    const kpiPharmacies = document.getElementById('admin-kpi-pharmacies');
-    const kpiRx = document.getElementById('admin-kpi-rx');
-    const kpiRxBreakdown = document.getElementById('admin-kpi-rx-breakdown');
-    const kpiHealth = document.getElementById('admin-kpi-health');
-    const kpiMem = document.getElementById('admin-kpi-memory');
-
     const counts = t.counts || {};
-    if (kpiUsers) kpiUsers.textContent = counts.totalUsers || 0;
-    if (kpiUsersBreakdown) {
-        kpiUsersBreakdown.textContent = `Patients: ${counts.patients || 0} | Pharmacists: ${counts.pharmacists || 0} | Admins: ${counts.admins || 0}`;
-    }
-    if (kpiMeds) kpiMeds.textContent = counts.medicines || 0;
-    if (kpiPharmacies) kpiPharmacies.textContent = counts.pharmacies || 0;
-    if (kpiRx) kpiRx.textContent = counts.prescriptions || 0;
-    if (kpiRxBreakdown) {
-        kpiRxBreakdown.textContent = `Pending: ${counts.prescriptionsPending || 0} | Verified: ${counts.prescriptionsVerified || 0} | Dispensed: ${counts.prescriptionsDispensed || 0}`;
-    }
-
     const health = t.health || t.system || {};
-    if (kpiHealth) kpiHealth.textContent = health.status || 'HEALTHY';
-    if (kpiMem) {
-        kpiMem.textContent = `Memory: ${health.usedMemoryMb || 0} / ${health.maxMemoryMb || 0} MB | Uptime: ${health.uptime || 'Active'}`;
+
+    const elUsers = document.getElementById('admin-kpi-users');
+    const elUsersBreakdown = document.getElementById('admin-kpi-users-breakdown');
+    const elPharmacies = document.getElementById('admin-kpi-pharmacies');
+    const elMedicines = document.getElementById('admin-kpi-medicines');
+    const elRx = document.getElementById('admin-kpi-rx');
+    const elRxBreakdown = document.getElementById('admin-kpi-rx-breakdown');
+    const elReminders = document.getElementById('admin-kpi-reminders');
+    const elSseClients = document.getElementById('admin-kpi-sse-clients');
+    const elLowStock = document.getElementById('admin-kpi-low-stock');
+    const elHealth = document.getElementById('admin-kpi-health');
+    const elMem = document.getElementById('admin-kpi-memory');
+
+    if (elUsers) elUsers.textContent = counts.totalUsers !== undefined ? counts.totalUsers : '--';
+    if (elUsersBreakdown) {
+        elUsersBreakdown.textContent = `Patients: ${counts.patients || 0} | Pharmacists: ${counts.pharmacists || 0} | Admins: ${counts.admins || 0}`;
+    }
+    if (elPharmacies) elPharmacies.textContent = counts.pharmacies !== undefined ? counts.pharmacies : '--';
+    if (elMedicines) elMedicines.textContent = counts.medicines !== undefined ? counts.medicines : '--';
+    if (elRx) elRx.textContent = counts.prescriptions !== undefined ? counts.prescriptions : '--';
+    if (elRxBreakdown) {
+        elRxBreakdown.textContent = `Pending: ${counts.prescriptionsPending || 0} | Verified: ${counts.prescriptionsVerified || 0} | Dispensed: ${counts.prescriptionsDispensed || 0}`;
+    }
+    if (elReminders) elReminders.textContent = counts.activeReminders !== undefined ? counts.activeReminders : '0';
+    if (elSseClients) elSseClients.textContent = counts.activeSseClients !== undefined ? counts.activeSseClients : '1';
+    if (elLowStock) elLowStock.textContent = counts.lowStockItems !== undefined ? counts.lowStockItems : '0';
+
+    if (elHealth) elHealth.textContent = health.status || 'HEALTHY';
+    if (elMem) {
+        elMem.textContent = `Memory: ${health.usedMemoryMb || 0} / ${health.maxMemoryMb || 0} MB | Uptime: ${health.uptime || 'Active'}`;
     }
 
-    appendAdminAuditLine(`[TELEMETRY_SYNC] Polled. DB: ${health.database || 'CONNECTED'}`);
+    const openIssues = counts.openSupportIssues !== undefined ? counts.openSupportIssues : 0;
+    const adminIssuesBadge = document.getElementById('admin-nav-issues-badge');
+    if (adminIssuesBadge) {
+        adminIssuesBadge.textContent = openIssues;
+        adminIssuesBadge.style.display = openIssues > 0 ? 'inline-block' : 'none';
+    }
+    const adminIssuesOpenKpi = document.getElementById('admin-issues-open-kpi');
+    if (adminIssuesOpenKpi) {
+        adminIssuesOpenKpi.textContent = `${openIssues} Open Ticket${openIssues === 1 ? '' : 's'}`;
+        adminIssuesOpenKpi.className = openIssues > 0 ? 'badge-status-pill badge-error' : 'badge-status-pill badge-healthy';
+    }
+
+    const broadcastClientsCnt = document.getElementById('admin-broadcast-clients-cnt');
+    if (broadcastClientsCnt) {
+        broadcastClientsCnt.textContent = counts.activeSseClients !== undefined ? counts.activeSseClients : '1';
+    }
+
+    // Health subpanel fields
+    const elJvmAlloc = document.getElementById('health-jvm-allocated');
+    const elJvmUsed = document.getElementById('health-jvm-used');
+    const elJvmBar = document.getElementById('health-jvm-bar');
+    const elCpu = document.getElementById('health-cpu-cores');
+    const elUptime = document.getElementById('health-uptime-val');
+    const elHealthSse = document.getElementById('health-sse-clients-cnt');
+    const elHealthMarketSync = document.getElementById('health-market-last-sync');
+
+    if (elJvmAlloc) elJvmAlloc.textContent = `${health.maxMemoryMb || 512} MB`;
+    if (elJvmUsed) elJvmUsed.textContent = `${health.usedMemoryMb || 0} MB`;
+    if (elJvmBar && health.maxMemoryMb) {
+        const pct = Math.min(100, Math.round(((health.usedMemoryMb || 0) / health.maxMemoryMb) * 100));
+        elJvmBar.style.width = `${pct}%`;
+    }
+    if (elCpu) elCpu.textContent = `${health.availableProcessors || navigator.hardwareConcurrency || 4} Logical Cores`;
+    if (elUptime) elUptime.textContent = health.uptime || 'Active';
+    if (elHealthSse) elHealthSse.textContent = `${counts.activeSseClients || 1} active session(s)`;
+    if (elHealthMarketSync && health.lastSuccessfulMarketSync) {
+        elHealthMarketSync.textContent = new Date(health.lastSuccessfulMarketSync).toLocaleTimeString();
+    }
+
+    // Platform Core Status Dashboard Indicators
+    const dashDb = document.getElementById('dash-status-db');
+    const dashGemini = document.getElementById('dash-status-gemini');
+    const dashGroq = document.getElementById('dash-status-groq');
+    const dashSse = document.getElementById('dash-status-sse');
+    const dashMarket = document.getElementById('dash-status-market');
+
+    if (dashDb) {
+        dashDb.textContent = 'CONNECTED';
+        dashDb.className = 'badge-status-pill badge-healthy';
+    }
+    if (dashGemini) {
+        const isOk = health.geminiStatus && !health.geminiStatus.includes('UNAVAILABLE');
+        dashGemini.textContent = isOk ? 'CONFIGURED' : 'UNAVAILABLE';
+        dashGemini.className = isOk ? 'badge-status-pill badge-healthy' : 'badge-status-pill badge-unavailable';
+    }
+    if (dashGroq) {
+        const isOk = health.groqStatus && !health.groqStatus.includes('UNAVAILABLE');
+        dashGroq.textContent = isOk ? 'CONFIGURED' : 'UNAVAILABLE';
+        dashGroq.className = isOk ? 'badge-status-pill badge-healthy' : 'badge-status-pill badge-unavailable';
+    }
+    if (dashSse) {
+        const cnt = counts.activeSseClients !== undefined ? counts.activeSseClients : 1;
+        dashSse.textContent = cnt > 0 ? `ONLINE (${cnt})` : 'STANDBY';
+        dashSse.className = cnt > 0 ? 'badge-status-pill badge-healthy' : 'badge-status-pill badge-warning';
+    }
+    if (dashMarket) {
+        const syncStatus = health.marketSyncStatus || 'ACTIVE (5m)';
+        dashMarket.textContent = syncStatus;
+        dashMarket.className = 'badge-status-pill badge-healthy';
+    }
 }
 
 // ----------------------------------------------------
-// 1. User Management (CRUD)
+// 1. User Management (CRUD & Safety)
 // ----------------------------------------------------
 async function loadAdminUsers() {
     const tbody = document.getElementById('admin-users-table-body');
     if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell">Loading users from PostgreSQL database...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">Loading users from PostgreSQL database...</td></tr>';
     }
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/users`);
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/users`);
         if (res.ok) {
             const data = await res.json();
             adminUsersList = data.users || (Array.isArray(data) ? data : []);
             renderAdminUsersTable(adminUsersList);
         } else {
-            if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell text-error">Failed to fetch users.</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Failed to fetch users.</td></tr>';
         }
     } catch (e) {
         console.error('Error loading admin users:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="table-loading-cell text-error">Error connecting to server.</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="table-loading-cell text-error">Error connecting to server: ${escapeHtml(e.message)}</td></tr>`;
     }
 }
 
@@ -6286,21 +6972,29 @@ function renderAdminUsersTable(users) {
     if (!tbody) return;
 
     if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell">No users registered matching criteria.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">No users registered matching criteria.</td></tr>';
         return;
     }
 
     tbody.innerHTML = users.map(u => {
         const role = (u.role || 'PATIENT').toUpperCase();
+        const status = (u.status || 'ACTIVE').toUpperCase();
+
         let roleBadgeClass = 'badge-patient';
-        let roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-        let avatarSrc = u.customAvatar || (role === 'ADMIN' ? ADMIN_DEFAULT_AVATAR : '');
+        let roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
         if (role === 'PHARMACIST') {
             roleBadgeClass = 'badge-pharmacist';
-            roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>`;
+            roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`;
         } else if (role === 'ADMIN') {
             roleBadgeClass = 'badge-admin';
-            roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+            roleSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+        }
+
+        let statusBadge = '<span class="status-badge badge-success">ACTIVE</span>';
+        if (status === 'SUSPENDED') {
+            statusBadge = '<span class="status-badge badge-warning">SUSPENDED</span>';
+        } else if (status === 'DEACTIVATED') {
+            statusBadge = '<span class="status-badge badge-danger">DEACTIVATED</span>';
         }
 
         const contact = u.phone || u.email || 'None';
@@ -6311,11 +7005,7 @@ function renderAdminUsersTable(users) {
                 <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(u.id || '')}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        ${avatarSrc ? `
-                            <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(u.name || 'User')}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid ${role === 'ADMIN' ? '#f59e0b' : 'var(--primary-blue, #29a3b8)'}; flex-shrink:0;">
-                        ` : `
-                            <span style="display:flex; align-items:center; color:var(--primary-blue);">${roleSvg}</span>
-                        `}
+                        <span style="display:flex; align-items:center; color:var(--primary-blue);">${roleSvg}</span>
                         <div>
                             <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(u.name || 'Unnamed')}</strong>
                             <small style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(u.email || '')}</small>
@@ -6323,19 +7013,35 @@ function renderAdminUsersTable(users) {
                     </div>
                 </td>
                 <td><span class="user-role-pill ${roleBadgeClass}">${role}</span></td>
+                <td>${statusBadge}</td>
                 <td>
-                    <div style="font-size:0.85rem; display:flex; align-items:center; gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span>${escapeHtml(contact)}</span></div>
+                    <div style="font-size:0.85rem; display:flex; align-items:center; gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span>${escapeHtml(contact)}</span></div>
                     <small style="color:var(--text-muted);">${escapeHtml(address)}</small>
                 </td>
                 <td>
                     <span class="admin-cred-badge">
-                        ${role === 'PHARMACIST' && u.licenseNumber ? `Lic: ${escapeHtml(u.licenseNumber)}` : 'Active / Hash Protected'}
+                        ${role === 'PHARMACIST' && u.licenseNumber ? `Lic: ${escapeHtml(u.licenseNumber)}` : 'Hash Protected'}
                     </span>
                 </td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <button type="button" class="btn-action-edit" onclick="openAdminEditUserModal('${u.id}')" title="Edit User" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Edit</span></button>
-                        <button type="button" class="btn-action-delete" onclick="deleteAdminUser('${u.id}', '${escapeHtml(u.name)}')" title="Delete User" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span>Delete</span></button>
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditUserModal('${u.id}')" title="Edit User">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                            <span>Edit</span>
+                        </button>
+                        ${status === 'ACTIVE' ? `
+                            <button type="button" class="btn-action-warning" onclick="toggleAdminUserStatus('${u.id}', 'SUSPENDED')" title="Suspend User Access">
+                                <span>Suspend</span>
+                            </button>
+                        ` : `
+                            <button type="button" class="btn-action-verify" onclick="toggleAdminUserStatus('${u.id}', 'ACTIVE')" title="Activate User Access">
+                                <span>Activate</span>
+                            </button>
+                        `}
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminUser('${u.id}', '${escapeHtml(u.name || '')}')" title="Safe Remove / Deactivate">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -6346,15 +7052,29 @@ function renderAdminUsersTable(users) {
 function filterAdminUsersTable() {
     const search = (document.getElementById('admin-user-search')?.value || '').toLowerCase();
     const roleFilter = document.getElementById('admin-user-role-filter')?.value || 'ALL';
+    const statusFilter = document.getElementById('admin-user-status-filter')?.value || 'ALL';
+    const sortBy = document.getElementById('admin-user-sort-filter')?.value || 'NAME';
 
-    const filtered = adminUsersList.filter(u => {
+    let filtered = adminUsersList.filter(u => {
         const matchesRole = roleFilter === 'ALL' || (u.role || '').toUpperCase() === roleFilter;
+        const matchesStatus = statusFilter === 'ALL' || (u.status || 'ACTIVE').toUpperCase() === statusFilter;
         const matchesSearch = !search ||
             (u.name && u.name.toLowerCase().includes(search)) ||
             (u.email && u.email.toLowerCase().includes(search)) ||
+            (u.phone && u.phone.toLowerCase().includes(search)) ||
             (u.id && u.id.toLowerCase().includes(search));
-        return matchesRole && matchesSearch;
+        return matchesRole && matchesStatus && matchesSearch;
     });
+
+    if (sortBy === 'NAME') {
+        filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (sortBy === 'EMAIL') {
+        filtered.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+    } else if (sortBy === 'ROLE') {
+        filtered.sort((a, b) => (a.role || '').localeCompare(b.role || ''));
+    } else if (sortBy === 'CREATED') {
+        filtered.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    }
 
     renderAdminUsersTable(filtered);
 }
@@ -6387,6 +7107,8 @@ function openAdminAddUserModal() {
     document.getElementById('admin-user-pharma-name').value = '';
     document.getElementById('admin-user-pharma-license').value = '';
     document.getElementById('admin-user-role').value = 'PATIENT';
+    const statusSelect = document.getElementById('admin-user-status');
+    if (statusSelect) statusSelect.value = 'ACTIVE';
     toggleAdminUserRoleFields();
     openModal('modal-admin-user');
 }
@@ -6409,6 +7131,8 @@ function openAdminEditUserModal(userId) {
     document.getElementById('admin-user-pharma-name').value = user.pharmacyName || '';
     document.getElementById('admin-user-pharma-license').value = user.licenseNumber || '';
     document.getElementById('admin-user-role').value = (user.role || 'PATIENT').toUpperCase();
+    const statusSelect = document.getElementById('admin-user-status');
+    if (statusSelect) statusSelect.value = (user.status || 'ACTIVE').toUpperCase();
     toggleAdminUserRoleFields();
     openModal('modal-admin-user');
 }
@@ -6425,6 +7149,7 @@ async function handleAdminUserSubmit(e) {
     const address = document.getElementById('admin-user-address')?.value?.trim();
     const pharmacyName = document.getElementById('admin-user-pharma-name')?.value?.trim();
     const licenseNumber = document.getElementById('admin-user-pharma-license')?.value?.trim();
+    const status = document.getElementById('admin-user-status')?.value || 'ACTIVE';
 
     const payload = {
         name,
@@ -6434,7 +7159,8 @@ async function handleAdminUserSubmit(e) {
         emergencyContact,
         address,
         pharmacyName,
-        licenseNumber
+        licenseNumber,
+        status
     };
     if (password) {
         payload.password = password;
@@ -6443,16 +7169,14 @@ async function handleAdminUserSubmit(e) {
     try {
         let res;
         if (id) {
-            res = await fetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(id)}`, {
+            res = await adminFetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(id)}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
         } else {
-            res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+            res = await adminFetch(`${API_BASE_URL}/api/admin/users`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
         }
 
@@ -6467,22 +7191,47 @@ async function handleAdminUserSubmit(e) {
         }
     } catch (err) {
         console.error('Error saving admin user:', err);
-        showToast('Network error while saving user.', 'error');
+        showToast('Error while saving user.', 'error');
+    }
+}
+
+async function toggleAdminUserStatus(userId, targetStatus) {
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(userId)}/status`, {
+            method: 'PUT',
+            body: { status: targetStatus }
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast(`User status set to ${targetStatus}.`);
+            loadAdminUsers();
+            loadAdminData();
+        } else {
+            showToast(data.message || 'Failed to update user status.', 'error');
+        }
+    } catch (e) {
+        console.error('Error setting user status:', e);
+        showToast('Error updating status.', 'error');
     }
 }
 
 async function deleteAdminUser(userId, userName) {
-    if (!confirm(`Are you sure you want to permanently delete user "${userName || userId}"? This cannot be undone.`)) {
+    const promptMsg = `Are you sure you want to remove user "${userName || userId}"?\n\nSafety Policy: If this user has linked clinical records (prescriptions or reminders), the account will be safely DEACTIVATED rather than destroyed to protect database integrity.`;
+    if (!confirm(promptMsg)) {
         return;
     }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(userId)}`, {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/users/${encodeURIComponent(userId)}`, {
             method: 'DELETE'
         });
         const data = await res.json();
         if (res.ok && data.success !== false) {
-            showToast(`🗑️ User deleted successfully.`);
+            if (data.actionTaken === 'DEACTIVATED') {
+                showToast(`🛡️ User has clinical records: Safely DEACTIVATED to preserve medical history.`);
+            } else {
+                showToast(`🗑️ User record permanently deleted.`);
+            }
             loadAdminUsers();
             loadAdminData();
         } else {
@@ -6495,82 +7244,6 @@ async function deleteAdminUser(userId, userName) {
 }
 
 // ----------------------------------------------------
-// CSV DATA EXPORT UTILITIES (Client-side reporting)
-// ----------------------------------------------------
-function downloadCsvFile(filename, csvContent) {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function exportUsersCsv() {
-    if (!adminUsersList || adminUsersList.length === 0) {
-        showToast('No user records available to export.', 'warning');
-        return;
-    }
-    const headers = ['User ID', 'Full Name', 'Email Address', 'Account Role', 'Phone Number', 'Address / Store Details'];
-    const rows = adminUsersList.map(u => [
-        `"${(u.id || '').replace(/"/g, '""')}"`,
-        `"${(u.name || '').replace(/"/g, '""')}"`,
-        `"${(u.email || '').replace(/"/g, '""')}"`,
-        `"${(u.role || '').replace(/"/g, '""')}"`,
-        `"${(u.phone || '').replace(/"/g, '""')}"`,
-        `"${(u.address || u.pharmacyName || '').replace(/"/g, '""')}"`
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-    downloadCsvFile(`medilink_users_${new Date().toISOString().slice(0, 10)}.csv`, csv);
-    showToast('📥 Users directory exported to CSV successfully!');
-}
-
-function exportPharmaciesCsv() {
-    if (!adminPharmaciesList || adminPharmaciesList.length === 0) {
-        showToast('No pharmacy records available to export.', 'warning');
-        return;
-    }
-    const headers = ['Pharmacy ID', 'Pharmacy Name', 'City Area', 'Physical Street Address', 'Phone Hotline', '24 Hours Open', 'Emergency Delivery', 'Inventory SKUs'];
-    const rows = adminPharmaciesList.map(p => [
-        `"${(p.id || '').replace(/"/g, '""')}"`,
-        `"${(p.name || '').replace(/"/g, '""')}"`,
-        `"${(p.area || '').replace(/"/g, '""')}"`,
-        `"${(p.address || '').replace(/"/g, '""')}"`,
-        `"${(p.phone || '').replace(/"/g, '""')}"`,
-        p.is24Hours ? 'YES' : 'NO',
-        p.hasEmergencyDelivery ? 'YES' : 'NO',
-        p.stockCount || 0
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-    downloadCsvFile(`medilink_pharmacies_${new Date().toISOString().slice(0, 10)}.csv`, csv);
-    showToast('📥 Pharmacy network registry exported to CSV successfully!');
-}
-
-function exportMedicinesCsv() {
-    if (!adminMedicinesList || adminMedicinesList.length === 0) {
-        showToast('No medicine catalog records available to export.', 'warning');
-        return;
-    }
-    const headers = ['Medicine ID', 'Brand Name', 'Generic Formulation', 'Pharmaceutical Company', 'Strength', 'Formulation', 'Unit Price (BDT ৳)', 'Prescription Required'];
-    const rows = adminMedicinesList.map(m => [
-        `"${(m.id || '').replace(/"/g, '""')}"`,
-        `"${(m.brandName || '').replace(/"/g, '""')}"`,
-        `"${(m.genericName || '').replace(/"/g, '""')}"`,
-        `"${(m.company || '').replace(/"/g, '""')}"`,
-        `"${(m.strength || '').replace(/"/g, '""')}"`,
-        `"${(m.formulation || '').replace(/"/g, '""')}"`,
-        typeof m.unitPrice === 'number' ? m.unitPrice.toFixed(2) : (m.unitPrice || '0.00'),
-        m.prescriptionRequired ? 'YES (Rx)' : 'NO (OTC)'
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-    downloadCsvFile(`medilink_medicines_${new Date().toISOString().slice(0, 10)}.csv`, csv);
-    showToast('📥 Medicine catalog exported to CSV successfully!');
-}
-
-// ----------------------------------------------------
 // 2. Pharmacy Network Management (CRUD)
 // ----------------------------------------------------
 async function loadAdminPharmacies() {
@@ -6579,7 +7252,7 @@ async function loadAdminPharmacies() {
         tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">Loading pharmacy network from PostgreSQL database...</td></tr>';
     }
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/pharmacies`);
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacies`);
         if (res.ok) {
             const data = await res.json();
             adminPharmaciesList = data.pharmacies || (Array.isArray(data) ? data : []);
@@ -6604,11 +7277,11 @@ function renderAdminPharmaciesTable(pharmacies) {
 
     tbody.innerHTML = pharmacies.map(p => {
         const is24hBadge = p.is24Hours
-            ? '<span class="badge-24h" style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>24/7 Open</span>'
+            ? '<span class="badge-24h" style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>24/7 Open</span>'
             : '<span class="badge-standard-hours">Standard Hours</span>';
 
         const emergencyBadge = p.hasEmergencyDelivery
-            ? '<span class="badge-emergency-yes" style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Active</span>'
+            ? '<span class="badge-emergency-yes" style="display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Active</span>'
             : '<span class="badge-emergency-no">Standard</span>';
 
         const stockSkus = p.stockCount !== undefined ? p.stockCount : 0;
@@ -6618,22 +7291,28 @@ function renderAdminPharmaciesTable(pharmacies) {
                 <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(p.id || '')}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="display:flex; align-items:center; color:var(--primary-blue);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>
+                        <span style="display:flex; align-items:center; color:var(--primary-blue);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>
                         <div>
                             <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(p.name || 'Unnamed')}</strong>
-                            <small style="color:var(--primary-blue); font-weight:700; font-size:0.78rem; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(p.area || 'Dhaka')}</small>
+                            <small style="color:var(--primary-blue); font-weight:700; font-size:0.78rem; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(p.area || 'Dhaka')}</small>
                         </div>
                     </div>
                 </td>
                 <td style="max-width:240px; font-size:0.85rem; color:var(--text-muted);">${escapeHtml(p.address || '')}</td>
-                <td><span style="font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>${escapeHtml(p.phone || 'N/A')}</span></td>
+                <td><span style="font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>${escapeHtml(p.phone || 'N/A')}</span></td>
                 <td>${is24hBadge}</td>
                 <td>${emergencyBadge}</td>
                 <td><span class="badge-tag" style="font-weight:700;">${stockSkus} SKUs</span></td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <button type="button" class="btn-action-edit" onclick="openAdminEditPharmacyModal('${p.id}')" title="Edit Pharmacy" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Edit</span></button>
-                        <button type="button" class="btn-action-delete" onclick="deleteAdminPharmacy('${p.id}', '${escapeHtml(p.name)}')" title="Delete Pharmacy" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span>Delete</span></button>
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditPharmacyModal('${p.id}')" title="Edit Pharmacy">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                            <span>Edit</span>
+                        </button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminPharmacy('${p.id}', '${escapeHtml(p.name || '')}')" title="Delete Pharmacy">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -6727,16 +7406,14 @@ async function handleAdminPharmacySubmit(e) {
     try {
         let res;
         if (id) {
-            res = await fetch(`${API_BASE_URL}/api/admin/pharmacies/${encodeURIComponent(id)}`, {
+            res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacies/${encodeURIComponent(id)}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
         } else {
-            res = await fetch(`${API_BASE_URL}/api/admin/pharmacies`, {
+            res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacies`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
         }
 
@@ -6762,7 +7439,7 @@ async function deleteAdminPharmacy(pharmaId, pharmaName) {
     }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/pharmacies/${encodeURIComponent(pharmaId)}`, {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacies/${encodeURIComponent(pharmaId)}`, {
             method: 'DELETE'
         });
         const data = await res.json();
@@ -6789,7 +7466,7 @@ async function loadAdminMedicines() {
         tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">Loading medicine repository...</td></tr>';
     }
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/medicines`);
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/medicines`);
         if (res.ok) {
             const data = await res.json();
             adminMedicinesList = data.medicines || (Array.isArray(data) ? data : []);
@@ -6836,8 +7513,14 @@ function renderAdminMedicinesTable(meds) {
                 <td>${rxRequired}</td>
                 <td style="text-align:right;">
                     <div class="admin-table-actions">
-                        <button type="button" class="btn-action-edit" onclick="openAdminEditMedicineModal('${m.id}')" title="Edit Medicine" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Edit</span></button>
-                        <button type="button" class="btn-action-delete" onclick="deleteAdminMedicine('${m.id}', '${escapeHtml(m.brandName)}')" title="Delete Medicine" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span>Delete</span></button>
+                        <button type="button" class="btn-action-edit" onclick="openAdminEditMedicineModal('${m.id}')" title="Edit Medicine">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                            <span>Edit</span>
+                        </button>
+                        <button type="button" class="btn-action-delete" onclick="deleteAdminMedicine('${m.id}', '${escapeHtml(m.brandName || '')}')" title="Delete Medicine">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </td>
             </tr>
@@ -6910,6 +7593,11 @@ async function handleAdminMedicineSubmit(e) {
     const prescriptionRequired = document.getElementById('admin-med-rx-req')?.checked || false;
     const sideEffects = document.getElementById('admin-med-side-effects')?.value?.trim();
 
+    if (unitPrice < 0) {
+        showToast('Unit price cannot be negative.', 'error');
+        return;
+    }
+
     const payload = {
         brandName,
         genericName,
@@ -6925,16 +7613,14 @@ async function handleAdminMedicineSubmit(e) {
     try {
         let res;
         if (id) {
-            res = await fetch(`${API_BASE_URL}/api/admin/medicines/${encodeURIComponent(id)}`, {
+            res = await adminFetch(`${API_BASE_URL}/api/admin/medicines/${encodeURIComponent(id)}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
         } else {
-            res = await fetch(`${API_BASE_URL}/api/admin/medicines`, {
+            res = await adminFetch(`${API_BASE_URL}/api/admin/medicines`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
         }
 
@@ -6955,12 +7641,12 @@ async function handleAdminMedicineSubmit(e) {
 }
 
 async function deleteAdminMedicine(medId, medName) {
-    if (!confirm(`Delete "${medName || medId}" from catalog? This will remove all associated stock listings.`)) {
+    if (!confirm(`Delete "${medName || medId}" from catalog? This action will safely clean up orphaned inventory references.`)) {
         return;
     }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/medicines/${encodeURIComponent(medId)}`, {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/medicines/${encodeURIComponent(medId)}`, {
             method: 'DELETE'
         });
         const data = await res.json();
@@ -6979,15 +7665,36 @@ async function deleteAdminMedicine(medId, medName) {
 }
 
 // ----------------------------------------------------
-// 3. Prescription Master Oversight Queue
+// 4. Prescription Master Oversight & Compliance Queue
 // ----------------------------------------------------
+function switchRxSubView(viewName) {
+    const btnAll = document.getElementById('btn-view-rx-all');
+    const btnComp = document.getElementById('btn-view-rx-compliance');
+    const panelAll = document.getElementById('rx-view-panel-all');
+    const panelComp = document.getElementById('rx-view-panel-compliance');
+
+    if (viewName === 'compliance') {
+        if (btnAll) btnAll.classList.remove('active');
+        if (btnComp) btnComp.classList.add('active');
+        if (panelAll) panelAll.style.display = 'none';
+        if (panelComp) panelComp.style.display = 'block';
+        loadAdminComplianceQueue();
+    } else {
+        if (btnComp) btnComp.classList.remove('active');
+        if (btnAll) btnAll.classList.add('active');
+        if (panelComp) panelComp.style.display = 'none';
+        if (panelAll) panelAll.style.display = 'block';
+        loadAdminPrescriptions();
+    }
+}
+
 async function loadAdminPrescriptions() {
     const tbody = document.getElementById('admin-prescriptions-table-body');
     if (tbody) {
         tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">Loading prescription master queue...</td></tr>';
     }
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/prescriptions`);
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/prescriptions`);
         if (res.ok) {
             const data = await res.json();
             adminPrescriptionsList = data.prescriptions || (Array.isArray(data) ? data : []);
@@ -7013,9 +7720,10 @@ function renderAdminPrescriptionsTable(rxList) {
     tbody.innerHTML = rxList.map(rx => {
         const status = (rx.status || 'UPLOADED').toUpperCase();
         let statusBadge = `<span class="status-badge badge-warning">Pending (${status})</span>`;
-        if (status === 'VERIFIED') statusBadge = '<span class="status-badge badge-success" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Verified Genuine</span>';
-        else if (status === 'DISPENSED') statusBadge = '<span class="status-badge badge-info" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>Dispensed</span>';
-        else if (status === 'REJECTED') statusBadge = '<span class="status-badge badge-danger" style="display:inline-flex; align-items:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Flagged / Rejected</span>';
+        if (status === 'VERIFIED') statusBadge = '<span class="status-badge badge-success">Verified Genuine</span>';
+        else if (status === 'DISPENSE_READY') statusBadge = '<span class="status-badge badge-info">Dispense-Ready</span>';
+        else if (status === 'DISPENSED') statusBadge = '<span class="status-badge badge-info">Dispensed</span>';
+        else if (status === 'REJECTED') statusBadge = '<span class="status-badge badge-danger">Flagged / Rejected</span>';
 
         const itemsCount = (rx.items && Array.isArray(rx.items)) ? rx.items.length : 0;
         const itemsText = itemsCount > 0
@@ -7026,7 +7734,11 @@ function renderAdminPrescriptionsTable(rxList) {
 
         return `
             <tr>
-                <td style="font-family:'JetBrains Mono', monospace; font-size:0.82rem; font-weight:700; color:var(--text-heading);">${escapeHtml(rx.id || '')}</td>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.82rem; font-weight:700; color:var(--text-heading);">
+                    <a href="javascript:void(0)" onclick="openAdminRxDetails('${rx.id}')" style="color:var(--primary-blue); text-decoration:underline;">
+                        ${escapeHtml(rx.id || '')}
+                    </a>
+                </td>
                 <td>
                     <strong>${escapeHtml(rx.patientName || 'Anonymous Patient')}</strong>
                     <div style="font-size:0.75rem; color:var(--text-muted); font-family:'JetBrains Mono', monospace;">${escapeHtml(rx.patientId || '')}</div>
@@ -7036,7 +7748,7 @@ function renderAdminPrescriptionsTable(rxList) {
                     <small style="color:var(--text-muted);">${escapeHtml(rx.hospitalName || 'General Hospital')}</small>
                 </td>
                 <td>
-                    <div style="max-width:280px; font-size:0.82rem; line-height:1.4; color:var(--text-muted);" title="${escapeHtml(itemsText)}">
+                    <div style="max-width:260px; font-size:0.82rem; line-height:1.4; color:var(--text-muted);" title="${escapeHtml(itemsText)}">
                         ${escapeHtml(itemsText)}
                     </div>
                 </td>
@@ -7047,6 +7759,7 @@ function renderAdminPrescriptionsTable(rxList) {
                         <select class="admin-rx-status-select" onchange="adminUpdateRxStatus('${rx.id}', this.value)">
                             <option value="">-- Change State --</option>
                             <option value="VERIFIED" ${status === 'VERIFIED' ? 'selected' : ''}>Verify Genuine</option>
+                            <option value="DISPENSE_READY" ${status === 'DISPENSE_READY' ? 'selected' : ''}>Mark Dispense-Ready</option>
                             <option value="DISPENSED" ${status === 'DISPENSED' ? 'selected' : ''}>Mark Dispensed</option>
                             <option value="UPLOADED" ${status === 'UPLOADED' ? 'selected' : ''}>Reset to Uploaded</option>
                             <option value="REJECTED" ${status === 'REJECTED' ? 'selected' : ''}>Flag / Reject</option>
@@ -7078,19 +7791,19 @@ async function adminUpdateRxStatus(rxId, newStatus) {
     if (!newStatus) return;
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/prescriptions/${encodeURIComponent(rxId)}/status`, {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/prescriptions/${encodeURIComponent(rxId)}/status`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
+            body: { status: newStatus }
         });
         const data = await res.json();
         if (res.ok && data.success !== false) {
-            showToast(`Prescription ${rxId} status changed to ${newStatus}.`);
+            showToast(`Prescription ${rxId} state transitioned to ${newStatus}.`);
             loadAdminPrescriptions();
+            loadAdminComplianceQueue();
             loadAdminData();
             if (typeof loadPrescriptions === 'function') loadPrescriptions();
         } else {
-            showToast(data.message || 'Failed to update status.', 'error');
+            showToast(data.message || 'Failed to update prescription state.', 'error');
         }
     } catch (e) {
         console.error('Error updating prescription status:', e);
@@ -7098,33 +7811,496 @@ async function adminUpdateRxStatus(rxId, newStatus) {
     }
 }
 
-// ----------------------------------------------------
-// 4. Global Broadcast & Live Audit Stream
-// ----------------------------------------------------
-async function submitAdminBroadcast() {
-    const textarea = document.getElementById('admin-broadcast-text');
-    const message = (textarea?.value || '').trim();
+function openAdminRxDetails(rxId) {
+    const rx = adminPrescriptionsList.find(r => r.id === rxId);
+    if (!rx) return;
 
-    if (!message) {
-        showToast('Please type a message before broadcasting.', 'error');
+    const modalBody = document.getElementById('admin-rx-modal-body');
+    const modalTitle = document.getElementById('admin-rx-modal-title');
+    if (!modalBody) return;
+
+    if (modalTitle) modalTitle.textContent = `Prescription Inspection: ${rx.id}`;
+
+    const items = rx.items || [];
+    modalBody.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:16px;">
+            <div>
+                <span style="font-size:0.8rem; color:var(--text-muted); display:block;">Patient Name:</span>
+                <strong>${escapeHtml(rx.patientName || 'Anonymous')}</strong> (${escapeHtml(rx.patientId || '')})
+            </div>
+            <div>
+                <span style="font-size:0.8rem; color:var(--text-muted); display:block;">Prescribing Physician:</span>
+                <strong>${escapeHtml(rx.doctorName || 'Dr. Assigned')}</strong> - ${escapeHtml(rx.hospitalName || '')}
+            </div>
+            <div>
+                <span style="font-size:0.8rem; color:var(--text-muted); display:block;">Current Status:</span>
+                <span class="status-badge badge-info">${escapeHtml(rx.status || 'UPLOADED')}</span>
+            </div>
+            <div>
+                <span style="font-size:0.8rem; color:var(--text-muted); display:block;">Uploaded Timestamp:</span>
+                <span>${rx.uploadedAt ? new Date(rx.uploadedAt).toLocaleString() : 'N/A'}</span>
+            </div>
+        </div>
+
+        <h4 style="margin:16px 0 8px 0; border-bottom:1px solid var(--border-color); padding-bottom:6px;">Itemized Extracted Medications (${items.length})</h4>
+        ${items.length === 0 ? '<p class="text-muted">No parsed medications recorded.</p>' : `
+            <table class="admin-table" style="font-size:0.85rem; margin-top:8px;">
+                <thead>
+                    <tr>
+                        <th>Medicine</th>
+                        <th>Dosage</th>
+                        <th>Frequency</th>
+                        <th>Duration</th>
+                        <th>Instructions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(it => `
+                        <tr>
+                            <td><strong>${escapeHtml(it.medicineName || 'Medicine')}</strong></td>
+                            <td>${escapeHtml(it.dosage || '-')}</td>
+                            <td>${escapeHtml(it.frequency || 'Daily')}</td>
+                            <td>${escapeHtml(it.duration || 'As directed')}</td>
+                            <td><small>${escapeHtml(it.instructions || 'Standard')}</small></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `}
+    `;
+    openModal('modal-admin-rx-details');
+}
+
+async function loadAdminComplianceQueue() {
+    const tbody = document.getElementById('admin-compliance-table-body');
+    const badge = document.getElementById('admin-compliance-count');
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/prescriptions/compliance`);
+        if (res.ok) {
+            const data = await res.json();
+            adminComplianceQueue = data.issues || [];
+            if (badge) badge.textContent = adminComplianceQueue.length;
+            renderAdminComplianceTable(adminComplianceQueue);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Failed to fetch compliance queue.</td></tr>';
+        }
+    } catch (e) {
+        console.error('Error loading compliance queue:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Error connecting to server.</td></tr>';
+    }
+}
+
+function renderAdminComplianceTable(issues) {
+    const tbody = document.getElementById('admin-compliance-table-body');
+    if (!tbody) return;
+
+    if (!issues || issues.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell" style="color:#059669;">✅ No prescription compliance discrepancies detected. All prescriptions align with administrative protocols.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = issues.map(iss => {
+        const severityBadge = iss.severity === 'CRITICAL'
+            ? '<span class="status-badge badge-danger">CRITICAL</span>'
+            : '<span class="status-badge badge-warning">WARNING</span>';
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; font-weight:700;">
+                    <a href="javascript:void(0)" onclick="openAdminRxDetails('${iss.id}')" style="color:var(--primary-blue); text-decoration:underline;">
+                        ${escapeHtml(iss.id || '')}
+                    </a>
+                </td>
+                <td>
+                    <strong>${escapeHtml(iss.patientName || 'Patient')}</strong>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(iss.doctorName || 'Doctor')}</div>
+                </td>
+                <td style="font-size:0.8rem; color:var(--text-muted);">${iss.uploadedAt ? new Date(iss.uploadedAt).toLocaleDateString() : 'Recent'}</td>
+                <td><span class="status-badge badge-warning">${escapeHtml(iss.status || '')}</span></td>
+                <td>${severityBadge}</td>
+                <td>
+                    <strong style="color:var(--text-heading); font-size:0.85rem;">${escapeHtml(iss.anomalyType || 'DISCREPANCY')}</strong>
+                    <div style="font-size:0.78rem; color:var(--text-muted);">${escapeHtml(iss.anomalyDescription || '')}</div>
+                </td>
+                <td style="text-align:right;">
+                    <div class="admin-table-actions">
+                        <button type="button" class="btn-action-edit" onclick="adminUpdateRxStatus('${iss.id}', 'VERIFIED')" title="Approve & Verify">Verify</button>
+                        <button type="button" class="btn-action-delete" onclick="adminUpdateRxStatus('${iss.id}', 'REJECTED')" title="Flag as Discrepant">Flag</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ----------------------------------------------------
+// 5. Pharmacist Platform Verification & Accreditation
+// ----------------------------------------------------
+async function loadAdminPharmacists() {
+    const tbody = document.getElementById('admin-pharmacists-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">Loading pharmacist accreditation records...</td></tr>';
+    }
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacists`);
+        if (res.ok) {
+            const data = await res.json();
+            adminPharmacistsList = data.pharmacists || [];
+            renderAdminPharmacistsTable(adminPharmacistsList);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Failed to fetch pharmacists.</td></tr>';
+        }
+    } catch (e) {
+        console.error('Error loading pharmacists:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell text-error">Error connecting to server.</td></tr>';
+    }
+}
+
+function renderAdminPharmacistsTable(list) {
+    const tbody = document.getElementById('admin-pharmacists-table-body');
+    if (!tbody) return;
+
+    if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell">No registered pharmacist profiles found.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = list.map(ph => {
+        const isVerified = Boolean(ph.verified);
+        const status = (ph.status || 'ACTIVE').toUpperCase();
+
+        const verifyBadge = isVerified
+            ? '<span class="status-badge badge-success">VERIFIED ACCREDITED</span>'
+            : '<span class="status-badge badge-warning">PENDING VERIFICATION</span>';
+
+        const statusBadge = status === 'SUSPENDED'
+            ? '<span class="status-badge badge-danger">SUSPENDED</span>'
+            : '<span class="status-badge badge-success">ACTIVE</span>';
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted);">${escapeHtml(ph.id || '')}</td>
+                <td>
+                    <strong style="display:block; color:var(--text-heading); font-size:0.92rem;">${escapeHtml(ph.name || '')}</strong>
+                    <small style="color:var(--text-muted); font-size:0.8rem;">${escapeHtml(ph.email || '')}</small>
+                </td>
+                <td>
+                    <strong>${escapeHtml(ph.pharmacyName || 'Dispensary Store')}</strong>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(ph.phone || '')}</div>
+                </td>
+                <td>
+                    <span class="admin-cred-badge" style="font-size:0.85rem; font-weight:700;">
+                        ${escapeHtml(ph.licenseNumber || 'DGDA-PH-PENDING')}
+                    </span>
+                </td>
+                <td>${statusBadge}</td>
+                <td>${verifyBadge}</td>
+                <td style="text-align:right;">
+                    <div class="admin-table-actions">
+                        ${!isVerified ? `
+                            <button type="button" class="btn-action-verify" onclick="verifyAdminPharmacist('${ph.id}', '${escapeHtml(ph.name || '')}')" title="Grant Platform Verification">
+                                <span>Verify</span>
+                            </button>
+                        ` : ''}
+                        ${status === 'ACTIVE' ? `
+                            <button type="button" class="btn-action-warning" onclick="suspendAdminPharmacist('${ph.id}', '${escapeHtml(ph.name || '')}')" title="Suspend Dispensary Rights">
+                                <span>Suspend</span>
+                            </button>
+                        ` : `
+                            <button type="button" class="btn-action-verify" onclick="toggleAdminUserStatus('${ph.id}', 'ACTIVE')" title="Re-activate Credentials">
+                                <span>Restore</span>
+                            </button>
+                        `}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterAdminPharmacistsTable() {
+    const search = (document.getElementById('admin-pharma-user-search')?.value || '').toLowerCase();
+    const filter = document.getElementById('admin-pharma-verify-filter')?.value || 'ALL';
+
+    const filtered = adminPharmacistsList.filter(ph => {
+        const matchesSearch = !search ||
+            (ph.name && ph.name.toLowerCase().includes(search)) ||
+            (ph.email && ph.email.toLowerCase().includes(search)) ||
+            (ph.licenseNumber && ph.licenseNumber.toLowerCase().includes(search)) ||
+            (ph.pharmacyName && ph.pharmacyName.toLowerCase().includes(search));
+
+        let matchesFilter = true;
+        if (filter === 'VERIFIED') matchesFilter = Boolean(ph.verified);
+        else if (filter === 'PENDING') matchesFilter = !Boolean(ph.verified);
+        else if (filter === 'SUSPENDED') matchesFilter = (ph.status || '').toUpperCase() === 'SUSPENDED';
+
+        return matchesSearch && matchesFilter;
+    });
+
+    renderAdminPharmacistsTable(filtered);
+}
+
+async function verifyAdminPharmacist(pharmaId, name) {
+    if (!confirm(`Confirm platform accreditation and verification for pharmacist "${name || pharmaId}"?`)) {
         return;
     }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/api/admin/broadcast`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: message,
-                type: 'SYSTEM_ANNOUNCEMENT',
-                target: 'ALL'
-            })
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacists/${encodeURIComponent(pharmaId)}/verify`, {
+            method: 'PUT'
         });
         const data = await res.json();
         if (res.ok && data.success !== false) {
-            showToast('🚀 Global live announcement dispatched to all connected users!');
-            appendAdminAuditLine(`[ADMIN_DISPATCH] "${message}" broadcast to all sessions.`);
+            showToast(`✅ Pharmacist "${name}" verified and accredited!`);
+            loadAdminPharmacists();
+            loadAdminData();
+        } else {
+            showToast(data.message || 'Failed to verify pharmacist.', 'error');
+        }
+    } catch (e) {
+        console.error('Error verifying pharmacist:', e);
+        showToast('Error verifying pharmacist.', 'error');
+    }
+}
+
+async function suspendAdminPharmacist(pharmaId, name) {
+    if (!confirm(`Are you sure you want to suspend pharmacist credentials for "${name || pharmaId}"? They will be blocked from verifying prescriptions.`)) {
+        return;
+    }
+
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/pharmacists/${encodeURIComponent(pharmaId)}/suspend`, {
+            method: 'PUT'
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast(`⚠️ Pharmacist credentials suspended.`);
+            loadAdminPharmacists();
+            loadAdminData();
+        } else {
+            showToast(data.message || 'Failed to suspend pharmacist.', 'error');
+        }
+    } catch (e) {
+        console.error('Error suspending pharmacist:', e);
+        showToast('Error suspending pharmacist.', 'error');
+    }
+}
+
+// ----------------------------------------------------
+// 6. Reports & Aggregated Analytics
+// ----------------------------------------------------
+async function loadAdminReports() {
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/reports`);
+        if (res.ok) {
+            adminReportsData = await res.json();
+            renderAdminReports(adminReportsData);
+        }
+    } catch (e) {
+        console.error('Error loading reports:', e);
+        showToast('Failed to load reports analytics.', 'error');
+    }
+}
+
+function renderAdminReports(data) {
+    if (!data) return;
+
+    // Users distribution
+    const users = data.usersByRole || {};
+    const patCnt = users.PATIENT || 0;
+    const phCnt = users.PHARMACIST || 0;
+    const admCnt = users.ADMIN || 0;
+    const totalU = patCnt + phCnt + admCnt || 1;
+
+    const elPatCnt = document.getElementById('rep-patients-cnt');
+    const elPhCnt = document.getElementById('rep-pharmacists-cnt');
+    const elAdmCnt = document.getElementById('rep-admins-cnt');
+    const barPat = document.getElementById('rep-patients-bar');
+    const barPh = document.getElementById('rep-pharmacists-bar');
+    const barAdm = document.getElementById('rep-admins-bar');
+
+    if (elPatCnt) elPatCnt.textContent = `${patCnt} (${Math.round((patCnt / totalU) * 100)}%)`;
+    if (elPhCnt) elPhCnt.textContent = `${phCnt} (${Math.round((phCnt / totalU) * 100)}%)`;
+    if (elAdmCnt) elAdmCnt.textContent = `${admCnt} (${Math.round((admCnt / totalU) * 100)}%)`;
+    if (barPat) barPat.style.width = `${Math.round((patCnt / totalU) * 100)}%`;
+    if (barPh) barPh.style.width = `${Math.round((phCnt / totalU) * 100)}%`;
+    if (barAdm) barAdm.style.width = `${Math.round((admCnt / totalU) * 100)}%`;
+
+    // Prescriptions distribution
+    const rx = data.prescriptionsByStatus || {};
+    const upCnt = rx.UPLOADED || 0;
+    const verCnt = rx.VERIFIED || 0;
+    const dispCnt = (rx.DISPENSE_READY || 0) + (rx.DISPENSED || 0);
+    const totalRx = upCnt + verCnt + dispCnt || 1;
+
+    const elUp = document.getElementById('rep-rx-uploaded-cnt');
+    const elVer = document.getElementById('rep-rx-verified-cnt');
+    const elDisp = document.getElementById('rep-rx-dispensed-cnt');
+    const barUp = document.getElementById('rep-rx-uploaded-bar');
+    const barVer = document.getElementById('rep-rx-verified-bar');
+    const barDisp = document.getElementById('rep-rx-dispensed-bar');
+
+    if (elUp) elUp.textContent = `${upCnt} (${Math.round((upCnt / totalRx) * 100)}%)`;
+    if (elVer) elVer.textContent = `${verCnt} (${Math.round((verCnt / totalRx) * 100)}%)`;
+    if (elDisp) elDisp.textContent = `${dispCnt} (${Math.round((dispCnt / totalRx) * 100)}%)`;
+    if (barUp) barUp.style.width = `${Math.round((upCnt / totalRx) * 100)}%`;
+    if (barVer) barVer.style.width = `${Math.round((verCnt / totalRx) * 100)}%`;
+    if (barDisp) barDisp.style.width = `${Math.round((dispCnt / totalRx) * 100)}%`;
+
+    // Areas distribution
+    const areas = data.pharmaciesByArea || {};
+    const areasBody = document.getElementById('report-areas-body');
+    if (areasBody) {
+        const areaKeys = Object.keys(areas);
+        if (areaKeys.length === 0) {
+            areasBody.innerHTML = '<p class="text-muted">No geographical data registered.</p>';
+        } else {
+            const maxVal = Math.max(...Object.values(areas)) || 1;
+            areasBody.innerHTML = areaKeys.map(k => `
+                <div class="report-bar-group">
+                    <div class="report-bar-label">
+                        <span>${escapeHtml(k)}</span>
+                        <strong>${areas[k]} store(s)</strong>
+                    </div>
+                    <div class="report-bar-track"><div class="report-bar-fill bar-purple" style="width:${Math.round((areas[k] / maxVal) * 100)}%"></div></div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // Formulations distribution
+    const forms = data.medicinesByFormulation || {};
+    const formsBody = document.getElementById('report-forms-body');
+    if (formsBody) {
+        const formKeys = Object.keys(forms);
+        if (formKeys.length === 0) {
+            formsBody.innerHTML = '<p class="text-muted">No formulation data found.</p>';
+        } else {
+            const maxVal = Math.max(...Object.values(forms)) || 1;
+            formsBody.innerHTML = formKeys.map(k => `
+                <div class="report-bar-group">
+                    <div class="report-bar-label">
+                        <span>${escapeHtml(k)}</span>
+                        <strong>${forms[k]} medicines</strong>
+                    </div>
+                    <div class="report-bar-track"><div class="report-bar-fill bar-emerald" style="width:${Math.round((forms[k] / maxVal) * 100)}%"></div></div>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+// ----------------------------------------------------
+// 7. Administrative Audit Logs
+// ----------------------------------------------------
+async function loadAdminAuditLogs() {
+    const tbody = document.getElementById('admin-audit-logs-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">Loading audit trail from PostgreSQL...</td></tr>';
+    }
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/audit-logs`);
+        if (res.ok) {
+            const data = await res.json();
+            adminAuditLogsList = data.logs || (Array.isArray(data) ? data : []);
+            renderAdminAuditLogsTable(adminAuditLogsList);
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell text-error">Failed to fetch audit logs.</td></tr>';
+        }
+    } catch (e) {
+        console.error('Error loading audit logs:', e);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell text-error">Error connecting to server.</td></tr>';
+    }
+}
+
+function renderAdminAuditLogsTable(logs) {
+    const tbody = document.getElementById('admin-audit-logs-table-body');
+    if (!tbody) return;
+
+    if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="table-loading-cell">No administrative audit records logged yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = logs.map(l => {
+        let actionClass = 'badge-patient';
+        if (l.action === 'CREATE') actionClass = 'badge-success';
+        else if (l.action === 'DELETE') actionClass = 'badge-danger';
+        else if (l.action === 'UPDATE' || l.action === 'SUSPEND') actionClass = 'badge-warning';
+        else if (l.action === 'BROADCAST') actionClass = 'badge-info';
+
+        const timeStr = l.timestamp ? new Date(l.timestamp).toLocaleString() : 'N/A';
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-size:0.78rem; color:var(--text-muted);">${escapeHtml(String(l.id || ''))}</td>
+                <td style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">${timeStr}</td>
+                <td>
+                    <strong style="font-size:0.82rem; font-family:'JetBrains Mono', monospace;">${escapeHtml(l.adminId || 'System')}</strong>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(l.adminName || 'Admin')}</div>
+                </td>
+                <td><span class="status-badge ${actionClass}">${escapeHtml(l.action || 'ACTION')}</span></td>
+                <td><span class="badge-tag">${escapeHtml(l.entityType || '')} ${l.entityId ? `#${escapeHtml(l.entityId)}` : ''}</span></td>
+                <td style="font-size:0.85rem; max-width:300px; color:var(--text-heading);">${escapeHtml(l.description || '')}</td>
+                <td><span class="badge-status-pill badge-healthy">${escapeHtml(l.status || 'SUCCESS')}</span></td>
+                <td style="font-size:0.78rem; font-family:'JetBrains Mono', monospace; color:var(--text-muted);">${escapeHtml(l.ipAddress || '127.0.0.1')}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterAdminAuditLogsTable() {
+    const search = (document.getElementById('admin-audit-search')?.value || '').toLowerCase();
+    const actionFilter = document.getElementById('admin-audit-action-filter')?.value || 'ALL';
+    const entityFilter = document.getElementById('admin-audit-entity-filter')?.value || 'ALL';
+
+    const filtered = adminAuditLogsList.filter(l => {
+        const matchesAction = actionFilter === 'ALL' || (l.action || '').toUpperCase() === actionFilter;
+        const matchesEntity = entityFilter === 'ALL' || (l.entityType || '').toUpperCase() === entityFilter;
+        const matchesSearch = !search ||
+            (l.description && l.description.toLowerCase().includes(search)) ||
+            (l.adminId && l.adminId.toLowerCase().includes(search)) ||
+            (l.adminName && l.adminName.toLowerCase().includes(search));
+
+        return matchesAction && matchesEntity && matchesSearch;
+    });
+
+    renderAdminAuditLogsTable(filtered);
+}
+
+// ----------------------------------------------------
+// 8. Global Broadcast & Live Audit Feed
+// ----------------------------------------------------
+async function submitAdminBroadcast() {
+    const textarea = document.getElementById('admin-broadcast-text');
+    const categorySelect = document.getElementById('admin-broadcast-category');
+    const message = (textarea?.value || '').trim();
+    const category = categorySelect?.value || 'SYSTEM_NOTICE';
+
+    if (!message) {
+        showToast('Please type a broadcast message.', 'error');
+        return;
+    }
+    if (message.length > 500) {
+        showToast('Broadcast message exceeds 500 characters limit.', 'error');
+        return;
+    }
+
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/broadcast`, {
+            method: 'POST',
+            body: {
+                message: message,
+                type: category,
+                target: 'ALL'
+            }
+        });
+        const data = await res.json();
+        if (res.ok && data.success !== false) {
+            showToast('🚀 System broadcast dispatched to all connected users!');
+            appendAdminAuditLine(`[BROADCAST_${category}] "${message}" dispatched.`);
             if (textarea) textarea.value = '';
+            loadAdminData();
         } else {
             showToast(data.message || 'Failed to dispatch broadcast.', 'error');
         }
@@ -7150,33 +8326,765 @@ function appendAdminAuditLine(lineText) {
     }
 }
 
-// ==========================================
+// ----------------------------------------------------
+// 9. System Health Diagnostics
+// ----------------------------------------------------
+async function loadAdminHealthDiagnostics() {
+    showToast('Running comprehensive self-diagnostics...');
+    await loadAdminData();
+    showToast('✅ Diagnostics complete. All core subsystems operational.');
+}
+
+// ----------------------------------------------------
+// 10. Support Issues Governance (Admin)
+// ----------------------------------------------------
+let adminSupportIssuesList = [];
+let selectedAdminSupportIssue = null;
+
+async function loadAdminSupportIssues() {
+    const tbody = document.getElementById('admin-support-issues-tbody');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);"><div class="spinner-inline" style="margin-right:8px; display:inline-block;"></div>Loading support issues from PostgreSQL...</td></tr>';
+    }
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/support-issues`);
+        if (res.ok) {
+            const data = await res.json();
+            adminSupportIssuesList = data.issues || [];
+
+            // Update open ticket badge & count
+            const openCount = data.openCount !== undefined ? data.openCount : adminSupportIssuesList.filter(i => i.status === 'OPEN').length;
+            const badge = document.getElementById('admin-nav-issues-badge');
+            if (badge) {
+                badge.textContent = openCount;
+                badge.style.display = openCount > 0 ? 'inline-block' : 'none';
+            }
+            const kpi = document.getElementById('admin-issues-open-kpi');
+            if (kpi) {
+                kpi.textContent = `${openCount} Open Ticket${openCount === 1 ? '' : 's'}`;
+                kpi.className = openCount > 0 ? 'badge-status-pill badge-error' : 'badge-status-pill badge-healthy';
+            }
+
+            filterAdminSupportIssues();
+        } else {
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#ef4444;">Failed to load support issues from server.</td></tr>';
+            }
+        }
+    } catch (err) {
+        console.error('Error loading admin support issues:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#ef4444;">Error connecting to server: ${escapeHtml(err.message)}</td></tr>`;
+        }
+    }
+}
+
+function filterAdminSupportIssues() {
+    const search = (document.getElementById('admin-issue-search-input')?.value || '').trim().toLowerCase();
+    const statusFilter = document.getElementById('admin-issue-filter-status')?.value || 'ALL';
+    const severityFilter = document.getElementById('admin-issue-filter-severity')?.value || 'ALL';
+    const categoryFilter = document.getElementById('admin-issue-filter-category')?.value || 'ALL';
+
+    const filtered = adminSupportIssuesList.filter(item => {
+        const matchStatus = (statusFilter === 'ALL') || (item.status === statusFilter);
+        const matchSeverity = (severityFilter === 'ALL') || (item.severity === severityFilter);
+        const matchCategory = (categoryFilter === 'ALL') || (item.category === categoryFilter);
+        const matchSearch = !search ||
+            (item.id && item.id.toLowerCase().includes(search)) ||
+            (item.userName && item.userName.toLowerCase().includes(search)) ||
+            (item.userEmail && item.userEmail.toLowerCase().includes(search)) ||
+            (item.subject && item.subject.toLowerCase().includes(search)) ||
+            (item.description && item.description.toLowerCase().includes(search));
+
+        return matchStatus && matchSeverity && matchCategory && matchSearch;
+    });
+
+    renderAdminSupportIssuesTable(filtered);
+}
+
+function renderAdminSupportIssuesTable(issues) {
+    const tbody = document.getElementById('admin-support-issues-tbody');
+    if (!tbody) return;
+
+    if (!issues || issues.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:35px; color:var(--text-muted);">No reported support issues found matching the criteria.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = issues.map(iss => {
+        // Severity badge
+        let sevClass = 'badge-severity-low';
+        if (iss.severity === 'High/Urgent') sevClass = 'badge-severity-high';
+        else if (iss.severity === 'Medium') sevClass = 'badge-severity-med';
+
+        // Status badge
+        let statusClass = 'badge-ticket-open';
+        if (iss.status === 'RESOLVED') statusClass = 'badge-ticket-resolved';
+        else if (iss.status === 'IN_PROGRESS') statusClass = 'badge-ticket-progress';
+
+        // Role badge
+        const role = (iss.userRole || 'PATIENT').toUpperCase();
+        const roleClass = role === 'PHARMACIST' ? 'badge-role-pharmacist' : 'badge-role-patient';
+
+        const timeStr = iss.createdAt ? new Date(iss.createdAt).toLocaleString() : 'N/A';
+        const snippet = iss.description && iss.description.length > 80 ? iss.description.substring(0, 80) + '...' : (iss.description || '');
+
+        return `
+            <tr>
+                <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:var(--primary-blue, #29a3b8);">
+                    ${escapeHtml(iss.id)}
+                </td>
+                <td>
+                    <div style="font-weight:600; color:var(--text-heading);">${escapeHtml(iss.userName || 'Anonymous')}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:6px; margin-top:2px;">
+                        <span class="${roleClass}">${escapeHtml(role)}</span>
+                        <span>${escapeHtml(iss.userEmail || '')}</span>
+                    </div>
+                </td>
+                <td>
+                    <span style="font-size:0.85rem; color:var(--text-main); font-weight:500;">${escapeHtml(iss.category || 'General')}</span>
+                </td>
+                <td>
+                    <span class="${sevClass}">
+                        ${iss.severity === 'High/Urgent' ? '⚠️ ' : ''}${escapeHtml(iss.severity || 'Medium')}
+                    </span>
+                </td>
+                <td style="max-width:240px;">
+                    <strong style="color:var(--text-heading); font-size:0.85rem; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        ${escapeHtml(iss.subject || 'No Subject')}
+                    </strong>
+                    <div style="font-size:0.78rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        ${escapeHtml(snippet)}
+                    </div>
+                </td>
+                <td style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
+                    ${timeStr}
+                </td>
+                <td>
+                    <span class="${statusClass}">${escapeHtml(iss.status || 'OPEN')}</span>
+                </td>
+                <td style="text-align:right; white-space:nowrap;">
+                    <button type="button" class="btn-table-action" onclick="openResolveIssueModal('${escapeHtml(iss.id)}')">
+                        Inspect &amp; Resolve
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openResolveIssueModal(issueId) {
+    const issue = adminSupportIssuesList.find(i => i.id === issueId);
+    if (!issue) {
+        showToast('Ticket not found in local cache.', 'error');
+        return;
+    }
+    selectedAdminSupportIssue = issue;
+
+    const modalTitle = document.getElementById('admin-issue-modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = `Ticket ${issue.id} Investigation`;
+    }
+
+    const modalBody = document.getElementById('admin-issue-modal-body');
+    if (modalBody) {
+        const role = (issue.userRole || 'PATIENT').toUpperCase();
+        const roleClass = role === 'PHARMACIST' ? 'badge-role-pharmacist' : 'badge-role-patient';
+        const timeStr = issue.createdAt ? new Date(issue.createdAt).toLocaleString() : 'N/A';
+
+        modalBody.innerHTML = `
+            <div class="issue-detail-card">
+                <div class="issue-detail-grid">
+                    <div class="issue-detail-item">
+                        <span class="issue-detail-label">Reported By</span>
+                        <span class="issue-detail-val">
+                            <strong>${escapeHtml(issue.userName || 'Anonymous')}</strong>
+                            <span class="${roleClass}" style="margin-left:6px;">${escapeHtml(role)}</span>
+                        </span>
+                        <small style="color:var(--text-muted); font-size:0.75rem;">${escapeHtml(issue.userEmail || 'No email provided')} (User ID: ${escapeHtml(issue.userId || 'N/A')})</small>
+                    </div>
+                    <div class="issue-detail-item">
+                        <span class="issue-detail-label">Submission Date</span>
+                        <span class="issue-detail-val">${timeStr}</span>
+                    </div>
+                    <div class="issue-detail-item">
+                        <span class="issue-detail-label">Category</span>
+                        <span class="issue-detail-val" style="color:var(--primary-blue, #29a3b8);">${escapeHtml(issue.category || 'General')}</span>
+                    </div>
+                    <div class="issue-detail-item">
+                        <span class="issue-detail-label">Severity Level</span>
+                        <span class="issue-detail-val">
+                            <span class="${issue.severity === 'High/Urgent' ? 'badge-severity-high' : (issue.severity === 'Medium' ? 'badge-severity-med' : 'badge-severity-low')}">
+                                ${escapeHtml(issue.severity || 'Medium')}
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;">
+                    <span class="issue-detail-label">Subject</span>
+                    <h4 style="margin:4px 0 10px 0; color:var(--text-heading); font-size:1.05rem;">${escapeHtml(issue.subject || '')}</h4>
+
+                    <span class="issue-detail-label">Issue Details &amp; User Narrative</span>
+                    <div class="issue-desc-box">${escapeHtml(issue.description || 'No description provided.')}</div>
+
+                    ${issue.attachmentName ? `
+                        <div style="margin-top:10px; display:flex; align-items:center; gap:8px; font-size:0.82rem; color:var(--text-muted); background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                            <span>Attached Evidence: <strong>${escapeHtml(issue.attachmentName)}</strong></span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <label style="display:block; font-size:0.85rem; font-weight:600; color:var(--text-heading); margin-bottom:6px;">
+                    Update Ticket Status
+                </label>
+                <select id="admin-modal-issue-status" class="form-control" style="width:100%; margin-bottom:12px; background:rgba(15,30,44,0.8); border:1px solid rgba(41,163,184,0.3); color:var(--text-heading); padding:8px 12px; border-radius:6px;">
+                    <option value="OPEN" ${issue.status === 'OPEN' ? 'selected' : ''}>OPEN (Awaiting Action)</option>
+                    <option value="IN_PROGRESS" ${issue.status === 'IN_PROGRESS' ? 'selected' : ''}>IN PROGRESS (Being Investigated)</option>
+                    <option value="RESOLVED" ${issue.status === 'RESOLVED' ? 'selected' : ''}>RESOLVED (Issue Closed / Solved)</option>
+                </select>
+
+                <label style="display:block; font-size:0.85rem; font-weight:600; color:var(--text-heading); margin-bottom:6px;">
+                    Administrative Resolution Notes &amp; Action Taken
+                </label>
+                <textarea id="admin-modal-issue-notes" rows="4" class="form-control" placeholder="Explain the root cause, steps taken, or message to the user..." style="width:100%; background:rgba(15,30,44,0.8); border:1px solid rgba(41,163,184,0.3); color:var(--text-heading); padding:10px 12px; border-radius:6px; font-size:0.88rem;">${escapeHtml(issue.adminNotes || '')}</textarea>
+            </div>
+        `;
+    }
+
+    openModal('modal-admin-support-issue');
+}
+
+async function saveAdminIssueStatus() {
+    if (!selectedAdminSupportIssue) return;
+    const saveBtn = document.getElementById('admin-issue-btn-save');
+    const newStatus = document.getElementById('admin-modal-issue-status')?.value;
+    const adminNotes = document.getElementById('admin-modal-issue-notes')?.value?.trim();
+
+    if (!newStatus) {
+        showToast('Please select a valid ticket status.');
+        return;
+    }
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving Resolution...';
+    }
+
+    try {
+        const payload = {
+            status: newStatus,
+            adminNotes: adminNotes || '',
+            adminId: state.currentUser?.id || 'admin_sys',
+            adminName: state.currentUser?.name || 'Administrator'
+        };
+
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/support-issues/${encodeURIComponent(selectedAdminSupportIssue.id)}/status`, {
+            method: 'PUT',
+            body: payload
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            showToast(`✅ Ticket ${selectedAdminSupportIssue.id} updated to ${newStatus}!`, 'success');
+            closeModal('modal-admin-support-issue');
+            loadAdminSupportIssues();
+            if (typeof loadAdminData === 'function') {
+                loadAdminData();
+            }
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            showToast(`Failed to update ticket: ${errData.message || 'Server error'}`);
+        }
+    } catch (err) {
+        console.error('Error saving issue status:', err);
+        showToast('Error saving ticket: ' + err.message);
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Update & Save Resolution';
+        }
+    }
+}
+
+window.loadAdminSupportIssues = loadAdminSupportIssues;
+window.filterAdminSupportIssues = filterAdminSupportIssues;
+window.openResolveIssueModal = openResolveIssueModal;
+window.saveAdminIssueStatus = saveAdminIssueStatus;
+
+
+// ----------------------------------------------------
+// 10. Bangladesh Market Live Price Controller & SSE
+// ----------------------------------------------------
+function handleLivePriceUpdateEvent(raw) {
+    console.log('[LIVE_MARKET_PRICE_EVENT]', raw);
+
+    let brandName = '';
+    let medId = null;
+    let genericName = '';
+    let oldPrice = 0;
+    let newPrice = null;
+    let pct = '0.0%';
+    let source = 'DGDA Bangladesh';
+
+    // 1. Attempt to parse JSON payload (removing/ignoring any leading [PRICE_UPDATE] prefix)
+    let data = null;
+    const jsonStart = raw.indexOf('{');
+    const jsonEnd = raw.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        try {
+            data = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+        } catch (e) {
+            console.warn('[LIVE_MARKET_PRICE_EVENT] Failed to parse JSON payload:', e);
+        }
+    }
+
+    if (data && typeof data === 'object') {
+        if (data.brandName) brandName = String(data.brandName).trim();
+        if (data.medicineId) medId = String(data.medicineId).trim();
+        if (data.genericName) genericName = String(data.genericName).trim();
+        if (data.oldPrice !== undefined && data.oldPrice !== null) {
+            oldPrice = parseFloat(data.oldPrice) || 0;
+        }
+        if (data.newPrice !== undefined && data.newPrice !== null) {
+            newPrice = parseFloat(data.newPrice);
+        }
+        if (data.changePercent) pct = String(data.changePercent).trim();
+        if (data.source) source = String(data.source).trim();
+    } else {
+        // Fallback for legacy text format: PRICE_UPDATE: Name (ID 1) changed from ৳X to ৳Y (Z%) via Source
+        const match = raw.match(/PRICE_UPDATE:\s*(.+?)\s*\(ID\s*([^)]+)\)\s*changed\s*from\s*৳([\d.]+)\s*to\s*৳([\d.]+)\s*\(([+-]?[\d.]+)%\)\s*via\s*(.+)/i);
+        if (match) {
+            brandName = match[1].trim();
+            medId = match[2].trim();
+            oldPrice = parseFloat(match[3]) || 0;
+            newPrice = parseFloat(match[4]);
+            pct = match[5];
+            source = match[6].trim();
+        }
+    }
+
+    // Safety guard: if newPrice is missing or invalid, or brandName is missing/corrupted, exit safely
+    if (newPrice === null || isNaN(newPrice) || !brandName || brandName === '[PRICE_UPDATE]') {
+        console.warn('[LIVE_MARKET_PRICE_EVENT] Ignored event due to missing or invalid price/brandName:', raw);
+        return;
+    }
+
+    if (state.medicines && state.medicines.length > 0) {
+        const found = state.medicines.find(m => (medId && m.id === medId) || m.brandName.toLowerCase() === brandName.toLowerCase());
+        if (found) {
+            found.unitPrice = newPrice;
+        }
+    }
+
+    const priceElements = [];
+    if (medId) {
+        const el = document.getElementById(`med-price-${medId}`);
+        if (el) priceElements.push(el);
+    }
+    document.querySelectorAll(`[data-med-id="${medId}"] .med-price`).forEach(el => {
+        if (!priceElements.includes(el)) priceElements.push(el);
+    });
+
+    const isIncrease = newPrice >= oldPrice;
+    const flashClass = isIncrease ? 'price-flash-up' : 'price-flash-down';
+
+    priceElements.forEach(el => {
+        el.textContent = `BDT ${newPrice.toFixed(2)}`;
+        el.setAttribute('data-price', newPrice);
+        el.classList.remove('price-flash-up', 'price-flash-down');
+        void el.offsetWidth;
+        el.classList.add(flashClass);
+    });
+
+    if (state.cart && Array.isArray(state.cart)) {
+        let cartUpdated = false;
+        state.cart.forEach(item => {
+            if ((medId && item.medicineId === medId) || (item.name && item.name.toLowerCase() === brandName.toLowerCase())) {
+                item.price = newPrice;
+                cartUpdated = true;
+            }
+        });
+        if (cartUpdated && typeof renderCart === 'function') {
+            renderCart();
+        }
+    }
+
+    const displayPct = pct.endsWith('%') ? pct : `${pct}%`;
+    showToast(`Market Price Alert: ${brandName} price updated to ৳${newPrice.toFixed(2)} (${displayPct}) via ${source}`);
+
+    const marketSubpanel = document.getElementById('admin-subpanel-market');
+    if (marketSubpanel && (marketSubpanel.classList.contains('active') || marketSubpanel.style.display === 'block')) {
+        loadMarketPriceData();
+        loadMarketPriceHistory();
+    }
+}
+
+async function loadMarketPriceData() {
+    const tbody = document.getElementById('market-prices-tbody');
+    const countEl = document.getElementById('market-items-count');
+    const providerNameEl = document.getElementById('market-provider-name');
+    const syncTimeEl = document.getElementById('market-last-sync-time');
+
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/prices`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (providerNameEl && data.provider) {
+            providerNameEl.textContent = data.provider;
+        }
+        if (syncTimeEl) {
+            syncTimeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        const items = data.marketItems || [];
+        if (countEl) countEl.textContent = `${items.length} National Registry benchmark medicines`;
+
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">No market data currently available.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+            const localMed = state.medicines ? state.medicines.find(m => m.brandName.toLowerCase() === item.brandName.toLowerCase()) : null;
+            const systemPrice = localMed ? `৳${localMed.unitPrice.toFixed(2)}` : '<span style="color:#94a3b8;">Not in catalog</span>';
+            const isSynced = localMed && Math.abs(localMed.unitPrice - item.mrp) < 0.01;
+            const statusBadge = isSynced
+                ? '<span style="background:#ecfdf5; color:#059669; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600;">SYNCHRONIZED</span>'
+                : (localMed
+                    ? '<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600;">PENDING SYNC</span>'
+                    : '<span style="background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:0.75rem;">UNTRACKED</span>');
+
+            return `
+                <tr>
+                    <td style="font-weight:600; color:var(--text-heading, #0f172a);">${escapeHtml(item.brandName)}</td>
+                    <td>${escapeHtml(item.genericName)}</td>
+                    <td>${escapeHtml(item.manufacturer || 'Top BD Pharma')}</td>
+                    <td>${escapeHtml(item.strength || '')} <small style="color:#64748b;">${escapeHtml(item.dosageForm || '')}</small></td>
+                    <td style="font-weight:700; color:#0284c7;">৳${item.mrp.toFixed(2)}</td>
+                    <td style="font-weight:700;">${systemPrice}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size:0.8rem; color:#64748b;">${new Date().toLocaleTimeString()}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Failed to load market prices:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#ef4444;">Failed to load live Bangladesh market data: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function loadMarketPriceHistory() {
+    const tbody = document.getElementById('market-history-tbody');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/history`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const history = data.history || [];
+
+        if (history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No price fluctuations logged yet. Run a sync or trigger a simulation.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = history.map(h => {
+            const isUp = h.newPrice > h.oldPrice;
+            const diff = h.newPrice - h.oldPrice;
+            const sign = diff >= 0 ? '+' : '';
+            const color = isUp ? '#ef4444' : '#10b981';
+            const icon = isUp ? '▲' : '▼';
+            const formattedTime = new Date(h.changedAt).toLocaleString();
+
+            return `
+                <tr>
+                    <td style="font-size:0.82rem; color:#64748b; font-family:var(--font-mono, monospace);">${formattedTime}</td>
+                    <td style="font-weight:600;">${escapeHtml(h.brandName)}</td>
+                    <td>৳${h.oldPrice.toFixed(2)}</td>
+                    <td style="font-weight:700; color:${color};">৳${h.newPrice.toFixed(2)}</td>
+                    <td style="font-weight:600; color:${color};">${icon} ${sign}৳${Math.abs(diff).toFixed(2)} (${sign}${h.percentChange.toFixed(1)}%)</td>
+                    <td><span style="background:var(--bg-card, #f8fafc); border:1px solid var(--border-color, #e2e8f0); padding:2px 8px; border-radius:4px; font-size:0.75rem;">${escapeHtml(h.source)}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Failed to load market history:', err);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#ef4444;">Failed to load audit history: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function syncMarketPricesNow() {
+    const badge = document.getElementById('market-sync-status-badge');
+    if (badge) {
+        badge.textContent = 'SYNCING NOW...';
+        badge.style.background = '#fef3c7';
+        badge.style.color = '#b45309';
+    }
+
+    showToast('🔄 Synchronizing MediLink medicine prices with Bangladesh Market API...');
+    try {
+        const res = await adminFetch(`${API_BASE_URL}/api/admin/market/sync`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            showToast(`✓ Bangladesh Market Sync Complete: ${data.message || 'Prices up to date.'}`);
+            await loadMedicines();
+            await loadMarketPriceData();
+            await loadMarketPriceHistory();
+        } else {
+            showToast(`⚠️ Sync notice: ${data.message || 'Unknown response'}`);
+        }
+    } catch (err) {
+        console.error('Manual sync failed:', err);
+        showToast('❌ Sync failed: ' + err.message);
+    } finally {
+        if (badge) {
+            badge.textContent = 'AUTO-SYNC ACTIVE';
+            badge.style.background = '#ecfdf5';
+            badge.style.color = '#059669';
+        }
+    }
+}
+
+async function simulateMarketPriceFluctuation() {
+    const candidates = ['Napa Extra', 'Seclo', 'Monas', 'Sergel', 'Ace Plus', 'Ciprocin', 'Almex'];
+    const brand = candidates[Math.floor(Math.random() * candidates.length)];
+    const pctDeltas = [15.0, -10.0, 20.0, -12.5, 25.0, 8.5, -5.0];
+    const pct = pctDeltas[Math.floor(Math.random() * pctDeltas.length)];
+
+    showToast(`⚡ Simulating DGDA regulatory price revision for ${brand} (${pct > 0 ? '+' : ''}${pct}%)...`);
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/market/simulate-fluctuation?brandName=${encodeURIComponent(brand)}&percentChange=${pct}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`⚡ Simulated: ${data.message}`);
+            await loadMarketPriceData();
+            await loadMarketPriceHistory();
+        } else {
+            showToast(`Simulation notice: ${data.message || 'Error'}`);
+        }
+    } catch (err) {
+        console.error('Simulation failed:', err);
+        showToast('❌ Simulation failed: ' + err.message);
+    }
+}
+
+// ----------------------------------------------------
+// 11. CSV Data Export Utilities (UTF-8 with BOM & Escaping)
+// ----------------------------------------------------
+function downloadCsvFile(filename, csvContent) {
+    // Prefix with \uFEFF for proper UTF-8 BOM encoding (preserves Bangla script in Excel)
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function csvSafe(val) {
+    if (val === undefined || val === null) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+}
+
+function exportUsersCsv() {
+    if (!adminUsersList || adminUsersList.length === 0) {
+        showToast('No user records available to export.', 'warning');
+        return;
+    }
+    const headers = ['User ID', 'Full Name', 'Email Address', 'Account Role', 'Account Status', 'Phone Number', 'Address / Store Details'];
+    const rows = adminUsersList.map(u => [
+        csvSafe(u.id),
+        csvSafe(u.name),
+        csvSafe(u.email),
+        csvSafe(u.role),
+        csvSafe(u.status || 'ACTIVE'),
+        csvSafe(u.phone),
+        csvSafe(u.address || u.pharmacyName || '')
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_users_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Users directory exported to CSV successfully!');
+}
+
+function exportPharmaciesCsv() {
+    if (!adminPharmaciesList || adminPharmaciesList.length === 0) {
+        showToast('No pharmacy records available to export.', 'warning');
+        return;
+    }
+    const headers = ['Pharmacy ID', 'Pharmacy Name', 'City Area', 'Physical Street Address', 'Phone Hotline', '24 Hours Open', 'Emergency Delivery', 'Inventory SKUs'];
+    const rows = adminPharmaciesList.map(p => [
+        csvSafe(p.id),
+        csvSafe(p.name),
+        csvSafe(p.area),
+        csvSafe(p.address),
+        csvSafe(p.phone),
+        p.is24Hours ? '"YES"' : '"NO"',
+        p.hasEmergencyDelivery ? '"YES"' : '"NO"',
+        csvSafe(p.stockCount || 0)
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_pharmacies_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Pharmacy network registry exported to CSV successfully!');
+}
+
+function exportMedicinesCsv() {
+    if (!adminMedicinesList || adminMedicinesList.length === 0) {
+        showToast('No medicine catalog records available to export.', 'warning');
+        return;
+    }
+    const headers = ['Medicine ID', 'Brand Name', 'Generic Formulation', 'Pharmaceutical Company', 'Strength', 'Formulation', 'Unit Price (BDT ৳)', 'Prescription Required'];
+    const rows = adminMedicinesList.map(m => [
+        csvSafe(m.id),
+        csvSafe(m.brandName),
+        csvSafe(m.genericName),
+        csvSafe(m.company),
+        csvSafe(m.strength),
+        csvSafe(m.formulation),
+        csvSafe(typeof m.unitPrice === 'number' ? m.unitPrice.toFixed(2) : (m.unitPrice || '0.00')),
+        m.prescriptionRequired ? '"YES (Rx)"' : '"NO (OTC)"'
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_medicines_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Medicine catalog exported to CSV successfully!');
+}
+
+function exportPrescriptionsCsv() {
+    if (!adminPrescriptionsList || adminPrescriptionsList.length === 0) {
+        showToast('No prescription records available to export.', 'warning');
+        return;
+    }
+    const headers = ['Prescription ID', 'Patient ID', 'Patient Name', 'Doctor Name', 'Hospital', 'Status', 'Uploaded Time', 'Medications Count'];
+    const rows = adminPrescriptionsList.map(rx => [
+        csvSafe(rx.id),
+        csvSafe(rx.patientId),
+        csvSafe(rx.patientName),
+        csvSafe(rx.doctorName),
+        csvSafe(rx.hospitalName),
+        csvSafe(rx.status),
+        csvSafe(rx.uploadedAt ? new Date(rx.uploadedAt).toLocaleString() : ''),
+        csvSafe(rx.items ? rx.items.length : 0)
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_prescriptions_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Prescriptions audit registry exported to CSV successfully!');
+}
+
+function exportPriceHistoryCsv() {
+    const rows = [];
+    const tbody = document.getElementById('market-history-tbody');
+    if (tbody) {
+        tbody.querySelectorAll('tr').forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+            if (cells.length === 6 && !cells[0].includes('No price fluctuations')) {
+                rows.push(cells.map(c => csvSafe(c)));
+            }
+        });
+    }
+    if (rows.length === 0) {
+        showToast('No price history available to export.', 'warning');
+        return;
+    }
+    const headers = ['Timestamp', 'Medicine Brand', 'Previous Price', 'New Market Price', 'Change (৳ / %)', 'Regulatory Source'];
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_price_history_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Price history exported to CSV successfully!');
+}
+
+function exportAuditLogsCsv() {
+    if (!adminAuditLogsList || adminAuditLogsList.length === 0) {
+        showToast('No administrative audit records available to export.', 'warning');
+        return;
+    }
+    const headers = ['Log ID', 'Timestamp', 'Admin ID', 'Admin Name', 'Action', 'Target Entity', 'Entity ID', 'Description', 'Status', 'Client IP'];
+    const rows = adminAuditLogsList.map(l => [
+        csvSafe(l.id),
+        csvSafe(l.timestamp ? new Date(l.timestamp).toLocaleString() : ''),
+        csvSafe(l.adminId),
+        csvSafe(l.adminName),
+        csvSafe(l.action),
+        csvSafe(l.entityType),
+        csvSafe(l.entityId),
+        csvSafe(l.description),
+        csvSafe(l.status),
+        csvSafe(l.ipAddress)
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    downloadCsvFile(`medilink_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    showToast('📥 Administrative audit logs exported to CSV successfully!');
+}
+
+
 // BANGLADESH MARKET LIVE PRICE CONTROLLER & SSE
 // ==========================================
 function handleLivePriceUpdateEvent(raw) {
     console.log('[LIVE_MARKET_PRICE_EVENT]', raw);
-    
-    // Pattern: PRICE_UPDATE: Napa Extra (ID 1) changed from ৳2.50 to ৳3.00 (20.0%) via DGDA Bangladesh Gazetted Price Update
-    const match = raw.match(/PRICE_UPDATE:\s*(.+?)\s*\(ID\s*(\d+)\)\s*changed\s*from\s*৳([\d.]+)\s*to\s*৳([\d.]+)\s*\(([+-]?[\d.]+)%\)\s*via\s*(.+)/i);
-    
-    let brandName = 'Medicine';
+
+    let brandName = '';
     let medId = null;
+    let genericName = '';
     let oldPrice = 0;
-    let newPrice = 0;
+    let newPrice = null;
     let pct = '0.0%';
     let source = 'DGDA Bangladesh';
 
-    if (match) {
-        brandName = match[1].trim();
-        medId = parseInt(match[2], 10);
-        oldPrice = parseFloat(match[3]);
-        newPrice = parseFloat(match[4]);
-        pct = match[5];
-        source = match[6].trim();
+    // 1. Attempt to parse JSON payload (removing/ignoring any leading [PRICE_UPDATE] prefix)
+    let data = null;
+    const jsonStart = raw.indexOf('{');
+    const jsonEnd = raw.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        try {
+            data = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+        } catch (e) {
+            console.warn('[LIVE_MARKET_PRICE_EVENT] Failed to parse JSON payload:', e);
+        }
+    }
+
+    if (data && typeof data === 'object') {
+        if (data.brandName) brandName = String(data.brandName).trim();
+        if (data.medicineId) medId = String(data.medicineId).trim();
+        if (data.genericName) genericName = String(data.genericName).trim();
+        if (data.oldPrice !== undefined && data.oldPrice !== null) {
+            oldPrice = parseFloat(data.oldPrice) || 0;
+        }
+        if (data.newPrice !== undefined && data.newPrice !== null) {
+            newPrice = parseFloat(data.newPrice);
+        }
+        if (data.changePercent) pct = String(data.changePercent).trim();
+        if (data.source) source = String(data.source).trim();
     } else {
-        // Fallback simple extract
-        const parts = raw.replace('PRICE_UPDATE:', '').trim();
-        brandName = parts.split(' ')[0] || 'Medicine';
+        // Fallback for legacy text format: PRICE_UPDATE: Name (ID 1) changed from ৳X to ৳Y (Z%) via Source
+        const match = raw.match(/PRICE_UPDATE:\s*(.+?)\s*\(ID\s*([^)]+)\)\s*changed\s*from\s*৳([\d.]+)\s*to\s*৳([\d.]+)\s*\(([+-]?[\d.]+)%\)\s*via\s*(.+)/i);
+        if (match) {
+            brandName = match[1].trim();
+            medId = match[2].trim();
+            oldPrice = parseFloat(match[3]) || 0;
+            newPrice = parseFloat(match[4]);
+            pct = match[5];
+            source = match[6].trim();
+        }
+    }
+
+    // Safety guard: if newPrice is missing or invalid, or brandName is missing/corrupted, exit safely
+    if (newPrice === null || isNaN(newPrice) || !brandName || brandName === '[PRICE_UPDATE]') {
+        console.warn('[LIVE_MARKET_PRICE_EVENT] Ignored event due to missing or invalid price/brandName:', raw);
+        return;
     }
 
     // 1. Update state.medicines cache in real-time
@@ -7235,12 +9143,13 @@ function handleLivePriceUpdateEvent(raw) {
     }
 
     // 5. User Notification Toast & Bell Feed
-    const toastMsg = `Market Price Alert: ${brandName} price updated to ৳${newPrice.toFixed(2)} (${pct}%) via ${source}`;
+    const displayPct = pct.endsWith('%') ? pct : `${pct}%`;
+    const toastMsg = `Market Price Alert: ${brandName} price updated to ৳${newPrice.toFixed(2)} (${displayPct}) via ${source}`;
     showToast(toastMsg);
     addNotification({
         icon: directionIconSvg,
         title: `Market MRP: ${brandName}`,
-        text: `Official market price updated from ৳${oldPrice.toFixed(2)} to ৳${newPrice.toFixed(2)} (${pct}%). Source: ${source}.`,
+        text: `Official market price updated from ৳${oldPrice.toFixed(2)} to ৳${newPrice.toFixed(2)} (${displayPct}). Source: ${source}.`,
         time: 'Just now'
     });
 
@@ -7264,7 +9173,7 @@ async function loadMarketPriceData() {
         const res = await fetch(`${API_BASE_URL}/api/market/prices`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        
+
         if (providerNameEl && data.provider) {
             providerNameEl.textContent = data.provider;
         }
@@ -7284,9 +9193,9 @@ async function loadMarketPriceData() {
             const localMed = state.medicines ? state.medicines.find(m => m.brandName.toLowerCase() === item.brandName.toLowerCase()) : null;
             const systemPrice = localMed ? `৳${localMed.unitPrice.toFixed(2)}` : '<span style="color:#94a3b8;">Not in catalog</span>';
             const isSynced = localMed && Math.abs(localMed.unitPrice - item.mrp) < 0.01;
-            const statusBadge = isSynced 
+            const statusBadge = isSynced
                 ? '<span style="background:#ecfdf5; color:#059669; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>SYNCHRONIZED</span>'
-                : (localMed 
+                : (localMed
                     ? '<span style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>PENDING SYNC</span>'
                     : '<span style="background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:6px; font-size:0.75rem;">UNTRACKED</span>');
 
@@ -7363,7 +9272,7 @@ async function syncMarketPricesNow() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/market/sync`, { method: 'POST' });
         const data = await res.json();
-        
+
         if (res.ok) {
             showToast(`✓ Bangladesh Market Sync Complete: ${data.message || 'Prices up to date.'}`);
             await loadMedicines();

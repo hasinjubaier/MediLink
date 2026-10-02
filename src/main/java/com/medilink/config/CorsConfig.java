@@ -6,11 +6,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Global Cross-Origin Resource Sharing (CORS) Configuration.
- * Enables the decoupled frontend application (running on any port, e.g. 3000, 5173, 5500)
+ * Enables the decoupled frontend application (running on any port, e.g. 3000,
+ * 5173, 5500)
  * to communicate seamlessly with the Spring Boot REST API on port 8080.
  */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private AdminSecurityInterceptor adminSecurityInterceptor;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -21,5 +25,11 @@ public class CorsConfig implements WebMvcConfigurer {
                 .exposedHeaders("Authorization", "Content-Type", "Cache-Control", "Connection")
                 .allowCredentials(false)
                 .maxAge(3600);
+    }
+
+    @Override
+    public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+        registry.addInterceptor(adminSecurityInterceptor)
+                .addPathPatterns("/api/admin/**");
     }
 }

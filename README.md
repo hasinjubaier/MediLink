@@ -114,15 +114,204 @@ flowchart LR
 
 ## 📈 Bangladesh Medicine Market Price Synchronization
 
-MediLink 2.0 features an automated market price tracking subsystem:
+MediLink 2.0 features an automated, enterprise-grade medicine market price tracking and synchronization subsystem designed to keep retail pharmaceutical pricing aligned with real-world Bangladesh market rates:
+
 - **Service**: [`MarketPriceSyncService.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/service/market/MarketPriceSyncService.java)
 - **Controller**: [`MarketPriceController.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/controller/MarketPriceController.java)
-- **Reference Provider**: [`BangladeshDgdaMedexProvider.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/service/market/BangladeshDgdaMedexProvider.java)
-- **Capabilities**:
-  - Automatically runs every 5 minutes (`@Scheduled`) to detect price fluctuations.
-  - Updates PostgreSQL medicine catalog and logs full historical audit entries (`MedicinePriceHistory`).
-  - Broadcasts price adjustments immediately to active client sessions via Server-Sent Events (SSE).
-  - Exposes REST endpoints (`/api/market/*`) for manual triggers and external distributor webhooks.
+- **Matching Engine**: [`MedicinePriceMatchingService.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/service/market/MedicinePriceMatchingService.java)
+- **Composite Strategy**: [`CompositeMarketPriceProvider.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/service/market/CompositeMarketPriceProvider.java)
+- **External Client**: [`ExternalMedicineApiClient.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/service/market/client/ExternalMedicineApiClient.java)
+- **Fallback Provider**: [`BangladeshDgdaMedexProvider.java`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/src/main/java/com/medilink/service/market/BangladeshDgdaMedexProvider.java)
+
+---
+
+### A. Provider Identity & Nature
+
+- **Active External Provider**: **MedEx via Apify** using Actor [`riad_h~medex-medicine-scraper`](https://apify.com/riad_h/medex-medicine-scraper).
+- **Important Distinction**: This external integration communicates with a **community scraper** that indexes retail pricing from the public Bangladesh MedEx catalog. It is **NOT an official government DGDA (Directorate General of Drug Administration) API**.
+- Official regulatory batch verification remains handled separately by MediLink's `DgdaBatchVerificationStrategy`.
+
+---
+
+### B. Scraper Characteristics & Field Availability
+
+Because the Apify Actor is a community scraper:
+- Scrape duration, network latency, and availability can fluctuate.
+- Guaranteed scraped fields include: `brand_name`, `strength`, `dosage_form`, `brand_id`, `url`, and `unit_price` / `mrp`.
+- Scraped records **may lack** `generic_name` and `manufacturer`. MediLink 2.0 is hardened to gracefully accept quotes missing these fields without failing validation.
+- Safe 5-Tier matching ensures prices are only applied to local medicines when unambiguous brand identity is verified.
+
+---
+
+### C. Exact Environment Configuration
+
+Create a `.env` file in the project root (never committed to version control):
+
+```bash
+# Market Integration Activation
+MARKET_API_ENABLED=true
+MARKET_PROVIDER=external
+
+# Apify Gateway & Actor
+MARKET_API_BASE_URL=https://api.apify.com/v2
+MARKET_API_KEY=YOUR_ACTUAL_APIFY_TOKEN
+MARKET_API_KEY_HEADER=Authorization
+MARKET_API_KEY_PREFIX=Bearer
+MEDICINE_APIFY_ACTOR_ID=riad_h~medex-medicine-scraper
+
+# Resilience, Timeouts & Retries
+MARKET_CONNECT_TIMEOUT_MS=10000
+MARKET_READ_TIMEOUT_MS=120000
+MARKET_MAX_RETRIES=2
+MARKET_FALLBACK_ENABLED=true
+
+# Scheduler (Runs every 5 minutes)
+MARKET_SYNC_DELAY_MS=300000
+MARKET_INITIAL_DELAY_MS=15000
+
+# Safety & Anti-Tamper Controls
+MARKET_WEBHOOK_SECRET=
+MARKET_SIMULATION_ENABLED=false
+MARKET_MAX_PRICE_CHANGE_PERCENT=50.0
+
+# MedEx Actor Scraping Limits
+MARKET_SEARCH_DEPTH=1
+MARKET_MAX_RESULTS=100
+MARKET_REQUEST_DELAY_MS=200
+```
+
+---
+
+### D. Manual Live Synchronization Procedure
+
+To trigger a live external synchronization on demand:
+
+```bash
+curl -X POST http://localhost:8080/api/market/sync \
+  -H "Content-Type: application/json" \
+  -d '{"triggerSource": "Manual Admin Live Test"}'
+```
+
+**Response includes full sync metrics**:
+```json
+{
+  "status": "COMPLETED",
+  "message": "Market price synchronization completed successfully.",
+  "triggerSource": "Manual Admin Live Test",
+  "provider": "MedEx via Apify",
+  "checkedMedicines": 12,
+  "updatedMedicines": 2,
+  "statistics": {
+    "localMedicinesConsidered": 12,
+    "externalRecordsRetrieved": 100,
+    "matchedMedicines": 10,
+    "updatedMedicines": 2,
+    "unchangedMedicines": 8,
+    "unmatchedMedicines": 2,
+    "invalidPriceRecords": 0,
+    "failedExternalRequests": 0,
+    "syncCoveragePercent": "83.3%",
+    "status": "PARTIAL_SUCCESS",
+    "timestamp": "2026-09-26T10:45:00"
+  }
+}
+```
+
+---
+
+### E. Diagnostic & Status Reporting
+
+Check health, provider status, and connectivity at `GET /api/market/status`:
+
+```bash
+curl -X GET http://localhost:8080/api/market/status
+```
+
+**Distinguishing Configuration vs Reachability vs Sync**:
+- `externalApiConfigured: true`: Credentials and URL are populated in configuration.
+- `externalApiReachable: true`: A real HTTP network exchange with the Apify Actor completed successfully (HTTP 200).
+- `data successfully synchronized`: External records were fetched, parsed, safely matched against PostgreSQL medicines, and persisted.
+
+```json
+{
+  "status": "SUCCESS",
+  "enabled": true,
+  "provider": "external",
+  "providerName": "MedEx via Apify",
+  "providerMode": "LIVE_EXTERNAL_API",
+  "externalApiConfigured": true,
+  "externalApiReachable": true,
+  "fallbackEnabled": true,
+  "fallbackActive": false,
+  "lastSyncStatus": "PARTIAL_SUCCESS",
+  "lastSyncAt": "2026-09-26T10:45:00",
+  "lastSyncStatistics": {
+    "localMedicinesConsidered": 12,
+    "externalRecordsRetrieved": 100,
+    "matchedMedicines": 10,
+    "updatedMedicines": 2,
+    "unchangedMedicines": 8,
+    "unmatchedMedicines": 2,
+    "syncCoveragePercent": "83.3%",
+    "status": "PARTIAL_SUCCESS"
+  }
+}
+```
+
+---
+
+### F. Verifying PostgreSQL Updates & Price History
+
+1. **Verify updated catalog prices**:
+   ```sql
+   SELECT id, brand_name, generic_name, company, unit_price 
+   FROM medicines 
+   ORDER BY brand_name;
+   ```
+   *`unit_price` updates only when a valid, positive, non-excessive external price is matched.*
+
+2. **Verify pharmacy stock cascade**:
+   ```sql
+   SELECT p.name AS pharmacy_name, m.brand_name, s.unit_price, s.last_updated 
+   FROM pharmacy_stocks s
+   JOIN medicines m ON s.medicine_id = m.id
+   JOIN partner_pharmacies p ON s.pharmacy_id = p.id;
+   ```
+
+3. **Verify audit trail in Price History**:
+   ```sql
+   SELECT id, brand_name, old_price, new_price, price_change, percentage_change, direction, source_registry, timestamp 
+   FROM medicine_price_history 
+   ORDER BY timestamp DESC 
+   LIMIT 10;
+   ```
+
+---
+
+### G. Resilient Fallback & Timeout Behavior
+
+- **HTTP Read Timeout**: Increased to **120,000 ms (2 minutes)** to accommodate comprehensive headless scraping runs on Apify.
+- **Graceful Timeout Recovery**: If Apify times out or is unreachable, the system:
+  - Logs a structured warning.
+  - Leaves all existing PostgreSQL prices and pharmacy stocks completely untouched.
+  - Automatically activates the local benchmark registry (`BangladeshDgdaMedexProvider`) if `MARKET_FALLBACK_ENABLED=true`.
+  - Sets diagnostic status to `TIMED_OUT` or `DEGRADED`.
+  - Never crashes background scheduler threads; subsequent sync cycles continue normally.
+
+---
+
+### H. The ">100 Medicines" Strategy & Scraper Limitations
+
+- **Actor Boundary**: The Apify Actor `riad_h~medex-medicine-scraper` does not support arbitrary search query parameters in its input schema (only `searchDepth`, `maxResults`, `requestDelayMs`).
+- **PostgreSQL-Grounded Sync**: Synchronization iterates through the medicines that **actually exist in PostgreSQL** (`medicineRepository.findAll()`).
+- **Partial Coverage Reporting**: If PostgreSQL contains more medicines than the scraped batch (e.g. catalog has 150 medicines while the scraper yields 100):
+  - MediLink never falsely claims 100% synchronization.
+  - Calculates true `syncCoveragePercent` (e.g. `66.7%`).
+  - Reports status `PARTIAL_SUCCESS`.
+  - Preserves local prices for all unmatched medicines.
+  - Deduplicates multiple external quotes targeting the same medicine to prevent duplicate audits.
+
+---
 
 ---
 
@@ -584,7 +773,14 @@ d:\ACADEMIC CAREER\12th Semester\Advance OOP\Medilink2.0
     │   │       └── market/                   # BD Market Price Synchronization
     │   │           ├── MarketPriceSyncService.java
     │   │           ├── MarketPriceProvider.java
-    │   │           └── BangladeshDgdaMedexProvider.java
+    │   │           ├── BangladeshDgdaMedexProvider.java
+    │   │           ├── CompositeMarketPriceProvider.java
+    │   │           ├── ExternalMedicineApiProvider.java
+    │   │           ├── MedicinePriceMatchingService.java
+    │   │           ├── client/
+    │   │           │   └── ExternalMedicineApiClient.java
+    │   │           └── dto/
+    │   │               └── ExternalMedicinePriceDto.java
     │   └── resources/
     │       ├── application.properties        # Application, database & AI properties
     │       └── static/                       # Web static assets (Single Source of Truth)
@@ -595,39 +791,218 @@ d:\ACADEMIC CAREER\12th Semester\Advance OOP\Medilink2.0
     │           ├── forgot-password.html      # Self-service OTP password reset
     │           ├── flags/                    # Country flag icons
     │           └── assets/images/            # Platform & testimonial imagery
-    └── test/                                 # Automated test suite (23 Unit Tests)
+    └── test/                                 # Automated test suite (102 Unit & Integration Tests)
         └── java/com/medilink/
+            ├── config/
+            │   └── AdminSecurityInterceptorTest.java
             ├── controller/
-            │   └── PrescriptionScanControllerTest.java # 5 Controller endpoint tests
+            │   ├── AdminAuthFlowTest.java
+            │   ├── AdminControllerComprehensiveTest.java
+            │   ├── MarketPriceControllerTest.java
+            │   ├── PrescriptionScanControllerTest.java
+            │   └── SupportIssueControllerTest.java
             └── service/
-                └── PrescriptionScanServiceTest.java     # 18 Service reconciliation & vision tests
+                ├── AuditLogServiceTest.java
+                ├── CsvExportValidationTest.java
+                ├── PrescriptionScanServiceTest.java
+                ├── UserServiceAdminTest.java
+                └── market/
+                    ├── ExternalMedicineApiClientTest.java
+                    ├── MarketPriceSyncServiceTest.java
+                    └── MedicinePriceMatchingServiceTest.java
 ```
 
 ---
 
-## 🧪 Verification & Testing (23 Automated Tests)
+## 📊 External Medicine Data Integration & Automated Market Price Synchronization
+
+MediLink 2.0 incorporates an enterprise-grade, configurable market pricing engine designed around the **Strategy Pattern**. It automatically keeps local medicine catalog prices, pharmacy stock prices, and patient retail estimates synchronized with verified Bangladesh pharmaceutical benchmarks.
+
+```
+                        MarketPriceProvider (Interface)
+                                       ▲
+        ┌──────────────────────────────┼──────────────────────────────┐
+        │                              │                              │
+CompositeMarketPriceProvider    BangladeshDgdaMedexProvider    ExternalMedicineApiProvider
+   (Primary Strategy Router)      (Authoritative Benchmark)     (Authenticated REST Client)
+        │
+   Safe Fallback ──► Database Cache / Benchmark Index
+```
+
+### Supported Provider Modes
+1. **`LIVE_EXTERNAL_API`**: Active when `MARKET_API_ENABLED=true`, a valid `MARKET_API_BASE_URL` is configured, and a genuine HTTP handshake succeeds. Never reported without network validation.
+2. **`DATABASE_FALLBACK`**: Automatically engaged if the external provider returns an error (4xx, 5xx), times out, or returns 0 records. Preserves last-known valid prices without database corruption.
+3. **`DATABASE_BENCHMARK`**: Default zero-configuration mode utilizing the authoritative DGDA National Drug Index benchmark.
+4. **`WEBHOOK`**: Ingests real-time price circulars from authorized pharmaceutical distributors.
+5. **`SIMULATION`**: Development/testing mode for demonstrative price revisions. Clearly tagged with `source: SIMULATION`.
+
+### Environment Configuration (.env / application.properties)
+Configure credentials securely via environment variables (see [`.env.example`](file:///d:/ACADEMIC%20CAREER/12th%20Semester/Advance%20OOP/Medilink2.0/.env.example)):
+```properties
+# Enable external market integration
+MARKET_API_ENABLED=true
+MARKET_PROVIDER=external
+MARKET_API_BASE_URL=https://api.approved-pharma-distributor.com/v1/medicines
+MARKET_API_KEY=your_secure_api_key_here
+MARKET_API_KEY_HEADER=Authorization
+MARKET_API_KEY_PREFIX=Bearer
+MARKET_CONNECT_TIMEOUT_MS=5000
+MARKET_READ_TIMEOUT_MS=15000
+MARKET_MAX_RETRIES=2
+MARKET_FALLBACK_ENABLED=true
+MARKET_SYNC_DELAY_MS=300000
+MARKET_INITIAL_DELAY_MS=15000
+MARKET_WEBHOOK_SECRET=your_webhook_shared_secret
+MARKET_SIMULATION_ENABLED=false
+```
+
+### Operational Workflows
+- **Automatic 5-Minute Polling Daemon**: `MarketPriceSyncService` runs every `300,000 ms` via Spring `@Scheduled`, executing atomic price updates across PostgreSQL `medicines` and `pharmacy_stocks`, followed by real-time SSE broadcasts.
+- **Manual Trigger**: Authorized admins can trigger an instant sync via `POST /api/market/sync` or the Admin Dashboard Quick Hub.
+- **Webhook Ingestion**: Push updates to `POST /api/market/webhook` with header `X-Webhook-Secret: <your_secret>`:
+  ```json
+  {
+    "brandName": "Napa Extra",
+    "newPrice": 3.00,
+    "source": "Approved DGDA Distributor Feed"
+  }
+  ```
+- **Auditable Price History**: All adjustments are permanently tracked in `medicine_price_history` with old price, new price, percentage change, and directional tagging (`INCREASED`, `DECREASED`, `UNCHANGED`).
+- **Regulatory Transparency Note**: DGDA and MedEx BD do not host an open unauthenticated public REST API. The system safely connects to authorized distributor REST endpoints or operates in authoritative benchmark fallback mode. Scraping without authorization is prohibited.
+
+---
+
+## 📈 Live Medicine Market Price Integration (MedEx via Apify)
+
+### 1. Overview
+The MediLink 2.0 Market Price module provides automated, real-time synchronization between external pharmaceutical market rates and local PostgreSQL catalog prices across Bangladesh.
+
+### 2. Apify Actor Specification
+- **Actor Name**: MedEx Medicine Scraper
+- **Actor Unique ID**: `riad_h~medex-medicine-scraper` (or `riad_h/medex-medicine-scraper`)
+- **Actor Store URL**: [https://apify.com/riad_h/medex-medicine-scraper](https://apify.com/riad_h/medex-medicine-scraper)
+- **Official Apify Base URL**: `https://api.apify.com/v2`
+- **Execution Endpoint**: `POST {baseUrl}/actors/{actorId}/run-sync-get-dataset-items`
+- **Source Label**: `MedEx via Apify` (data represents MedEx Bangladesh public medicine indices scraped via Apify; it is not an official government DGDA endpoint).
+
+### 3. Exact Input Schema
+```json
+{
+  "searchDepth": 1,
+  "maxResults": 100,
+  "requestDelayMs": 200
+}
+```
+- `searchDepth`: `1` (single-letter search ~280 brands) or `2` (two-letter combos ~2,900 brands).
+- `maxResults`: Maximum brand items to retrieve (0 = unlimited).
+- `requestDelayMs`: Politeness delay between MedEx AJAX queries.
+
+### 4. Normalized Dataset Output Fields
+The integration maps raw dataset items into `ExternalMedicinePriceDto`:
+- `brand_name` $\rightarrow$ `brandName` / `medicineName`
+- `generic_name` $\rightarrow$ `genericName`
+- `manufacturer` $\rightarrow$ `manufacturer` / `company`
+- `strength` $\rightarrow$ `strength` (e.g. `500 mg`, `20 mg`)
+- `dosage_form` $\rightarrow$ `dosageForm` (e.g. `Tablet`, `Capsule`, `Syrup`)
+- `brand_id` $\rightarrow$ `brandId`
+- `unit_price` / `price` / `mrp` $\rightarrow$ `unitPrice` (`BigDecimal`, scale 2, `HALF_UP`)
+- `url` $\rightarrow$ `sourceUrl`
+
+### 5. Required Environment Variables
+Configure these variables in your deployment environment or local `.env` file (NEVER commit live secrets):
+```dotenv
+# Enable external Apify provider
+MARKET_API_ENABLED=true
+MARKET_PROVIDER=external
+
+# Official Apify API Endpoint
+MARKET_API_BASE_URL=https://api.apify.com/v2
+MARKET_API_KEY=your_apify_api_token_here
+MARKET_API_KEY_HEADER=Authorization
+MARKET_API_KEY_PREFIX=Bearer
+
+# MedEx Scraper Actor ID
+MEDICINE_APIFY_ACTOR_ID=riad_h~medex-medicine-scraper
+
+# Network Resilience & Timeouts
+MARKET_CONNECT_TIMEOUT_MS=10000
+MARKET_READ_TIMEOUT_MS=120000
+MARKET_MAX_RETRIES=2
+
+# Automatic Fallback & Cadence
+MARKET_FALLBACK_ENABLED=true
+MARKET_SYNC_DELAY_MS=300000
+MARKET_INITIAL_DELAY_MS=15000
+
+# Security & Governance
+MARKET_WEBHOOK_SECRET=your_webhook_shared_secret
+MARKET_SIMULATION_ENABLED=false
+MARKET_MAX_PRICE_CHANGE_PERCENT=50.0
+
+# Scraper Target Volume
+MARKET_SEARCH_DEPTH=1
+MARKET_MAX_RESULTS=100
+MARKET_REQUEST_DELAY_MS=200
+```
+
+### 6. Strategy Pattern & Safe Matching
+1. **Tier 1 — Exact Normalized Brand Match**: Case-insensitive and trimmed comparison.
+2. **Tier 2 — Brand + Strength Match**: Matches combined strength (e.g. Napa 500mg).
+3. **Tier 3 — Brand + Dosage Form Match**: Matches dosage formulations (e.g. Napa Extra Tablet).
+4. **Tier 4 — Generic + Strength + Manufacturer Match**: Correlates molecule, potency, and pharmaceutical house.
+5. **Tier 5 — Constrained Canonical Alias Lookup**: Pre-registered canonical aliases.
+- **Ambiguity Guard**: If multiple local records match, automatic update is strictly aborted with a diagnostic warning to prevent false positive price overwrites (e.g. Napa vs Napa Extra).
+
+### 7. PostgreSQL Persistence & Stock Updates
+Whenever a price changes:
+1. `medicines.unit_price` is updated.
+2. All linked `pharmacy_stocks.unit_price` are synchronized and `last_updated` is stamped.
+3. An immutable audit record is saved in `medicine_price_history` (recording `oldPrice`, `newPrice`, `direction`, `percentageChange`, `source`, `timestamp`).
+4. Duplicate records are skipped when `oldPrice == newPrice`.
+5. Price swings exceeding `MARKET_MAX_PRICE_CHANGE_PERCENT` (e.g. >50%) are rejected to prevent aberrant market inputs.
+
+### 8. Real-Time SSE Broadcasting
+Immediately upon database transaction commit, `MarketPriceSyncService` dispatches a `PRICE_UPDATE` event via `StockObserverService` to `/api/events/stream`, delivering live price toasts to all active web clients without page reloads.
+
+### 9. 5-Minute Scheduler & Concurrency Guard
+- Scheduled with `@Scheduled(fixedDelayString = "${medilink.market.sync-delay-ms:300000}", initialDelayString = "${medilink.market.initial-delay-ms:15000}")`.
+- Guarded by an `AtomicBoolean` mutex to ensure jobs never overlap or run concurrently.
+
+### 10. Failover & Truthful Health Reporting
+- If Apify fails (HTTP 4xx/5xx, timeouts, or quota limits), the system automatically falls back to the curated `Local fallback/demo registry`.
+- Existing database prices are **never** zeroed or deleted.
+- `isLiveApiConnected()` truthfully reports `false` when running on fallback; `providerMode` is reported as `DATABASE_FALLBACK`.
+
+### 11. Webhook Security
+- `POST /api/market/webhook` enforces authentication via `X-Market-Webhook-Secret` or `X-Webhook-Secret`.
+- Compares secrets using constant-time `MessageDigest.isEqual` to prevent timing attacks.
+
+### 12. Simulation Endpoint Guard
+- `POST /api/market/simulate-fluctuation` is strictly gated behind `MARKET_SIMULATION_ENABLED=true`. In production mode (`false`), it returns `403 Forbidden`.
+
+---
+
+## 🧪 Verification & Testing (114 Automated Tests)
 
 ### Running Automated Tests
 ```powershell
 mvn test
 ```
 
-### Automated Test Suite Overview (23 / 23 Passing)
-- **`PrescriptionScanControllerTest`** (5 Tests):
-  - Valid image upload & JSON response structure.
-  - Missing file validation error (`400 Bad Request`).
-  - Unsupported file type handling (`.txt`, `.pdf`).
-  - File size threshold enforcement.
-  - Service unavailability error handling (`503 Service Unavailable`).
-- **`PrescriptionScanServiceTest`** (18 Tests):
-  - Dual-model agreement & status verification (`VERIFIED_BY_BOTH`).
-  - Gemini-primary fallback when Groq vision is unavailable.
-  - Groq-secondary fallback when Gemini service is rate-limited (`503`).
-  - Non-prescription image rejection (`isPrescription: false`).
-  - Missing patient name graceful handling without invention.
-  - Conflicting medicine dosage reconciliation & audit tagging.
-  - Multiple medication extraction and fuzzy matching.
-  - Transient API error retries.
+### Automated Test Suite Overview (114 / 114 Passing)
+- **`ExternalMedicineApiClientTest`** (10 Tests): Apify actor endpoint resolution, Bearer header injection, actor input body, timeouts, HTTP 401/403/429/500 errors, retry backoff, DTO validation.
+- **`ApifyMedicinePriceProviderTest`** (6 Tests): MedEx via Apify provider naming, live connectivity tracking, composite fallback coordination, provider modes.
+- **`MarketPriceSyncServiceTest`** (7 Tests): Price increase/decrease persistence, pharmacy stock sync, unchanged price idempotency, maxPriceChangePercent rejection, negative price rejection, fallback retention.
+- **`MedicinePriceMatchingServiceTest`** (8 Tests): 5-tier matching (exact, strength, dosage form, generic+mfg, alias), ambiguity rejection, Napa vs Napa Extra distinction.
+- **`MarketPriceControllerTest`** (7 Tests): Safe metadata retrieval without credential leakage, manual sync trigger, constant-time webhook secret authentication, simulation production guards, history filtering.
+- **`MarketApiPropertiesTest`** (2 Tests): Property binding, default values, and custom overrides.
+- **`AdminControllerComprehensiveTest`** (22 Tests): Platform governance, telemetry, user/pharma/med management, manual market sync.
+- **`PrescriptionScanControllerTest` & `PrescriptionScanServiceTest`** (23 Tests): Multimodal AI vision reconciliation, fallback chains, dosage verification.
+- **`SupportIssueControllerTest`** (6 Tests): Customer support tickets, issue reporting, admin resolution workflow.
+- **`AdminSecurityInterceptorTest`** (8 Tests): Session token validation, role-based access control, privilege separation.
+- **`AuditLogServiceTest` & `UserServiceAdminTest`** (10 Tests): Immutable audit trail, account status workflows.
+- **`CsvExportValidationTest`** (1 Test): CSV export verification.
+
 
 ---
 

@@ -24,6 +24,15 @@ public class Pharmacist extends User {
     @Column(name = "license_number", length = 50)
     private String licenseNumber;
 
+    @Column(name = "verification_status", length = 30)
+    private String verificationStatus = "VERIFIED";
+
+    @Column(name = "verified_at")
+    private java.time.LocalDateTime verifiedAt;
+
+    @Column(name = "verified_by_admin_id", length = 50)
+    private String verifiedByAdminId;
+
     public Pharmacist() {
         super();
         this.role = UserRole.PHARMACIST;
@@ -44,6 +53,15 @@ public class Pharmacist extends User {
 
     public String getLicenseNumber() { return licenseNumber; }
     public void setLicenseNumber(String licenseNumber) { this.licenseNumber = licenseNumber; }
+
+    public String getVerificationStatus() { return verificationStatus != null ? verificationStatus : "VERIFIED"; }
+    public void setVerificationStatus(String verificationStatus) { this.verificationStatus = verificationStatus; }
+
+    public java.time.LocalDateTime getVerifiedAt() { return verifiedAt; }
+    public void setVerifiedAt(java.time.LocalDateTime verifiedAt) { this.verifiedAt = verifiedAt; }
+
+    public String getVerifiedByAdminId() { return verifiedByAdminId; }
+    public void setVerifiedByAdminId(String verifiedByAdminId) { this.verifiedByAdminId = verifiedByAdminId; }
 
     @Override
     public String getDashboardInfo() {

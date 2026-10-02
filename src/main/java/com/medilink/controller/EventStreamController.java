@@ -58,4 +58,8 @@ public class EventStreamController {
         }
         emitters.removeAll(deadEmitters);
     }
+
+    public int getActiveClientCount() {
+        return emitters.size();
+    }
 }

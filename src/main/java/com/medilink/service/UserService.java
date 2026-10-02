@@ -24,6 +24,12 @@ public class UserService {
     private final AdminRepository adminRepository;
     private final EmailService emailService;
 
+    @Autowired(required = false)
+    private PrescriptionRepository prescriptionRepository;
+
+    @Autowired(required = false)
+    private ReminderRepository reminderRepository;
+
     // In-memory OTP store: email -> OtpRecord
     private final Map<String, OtpRecord> otpStore = new ConcurrentHashMap<>();
 
@@ -39,9 +45,9 @@ public class UserService {
 
     @Autowired
     public UserService(UserRepository userRepository,
-                       PatientRepository patientRepository,
-                       PharmacistRepository pharmacistRepository,
-                       AdminRepository adminRepository) {
+            PatientRepository patientRepository,
+            PharmacistRepository pharmacistRepository,
+            AdminRepository adminRepository) {
         this.userRepository = userRepository;
         this.patientRepository = patientRepository;
         this.pharmacistRepository = pharmacistRepository;
@@ -50,17 +56,20 @@ public class UserService {
     }
 
     public Optional<User> findByEmail(String email) {
-        if (email == null) return Optional.empty();
+        if (email == null)
+            return Optional.empty();
         return userRepository.findByEmailIgnoreCase(email.trim());
     }
 
     public Optional<User> findById(String id) {
-        if (id == null) return Optional.empty();
+        if (id == null)
+            return Optional.empty();
         return userRepository.findById(id);
     }
 
     public Optional<Patient> findPatientById(String id) {
-        if (id == null) return Optional.empty();
+        if (id == null)
+            return Optional.empty();
         return patientRepository.findById(id);
     }
 
@@ -69,14 +78,16 @@ public class UserService {
     }
 
     public User authenticate(String email, String password) {
-        if (email == null || password == null) return null;
+        if (email == null || password == null)
+            return null;
         Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email.trim());
-        if (!userOpt.isPresent()) return null;
+        if (!userOpt.isPresent())
+            return null;
 
         User user = userOpt.get();
         // Plaintext match or hash check for project demo
         if (user.getPasswordHash().equals(password) ||
-            user.getPasswordHash().equalsIgnoreCase(Integer.toHexString(password.hashCode()))) {
+                user.getPasswordHash().equalsIgnoreCase(Integer.toHexString(password.hashCode()))) {
             return user;
         }
         return null;
@@ -113,9 +124,17 @@ public class UserService {
             this.message = message;
         }
 
-        public String getCode() { return code; }
-        public boolean isLiveEmailSent() { return liveEmailSent; }
-        public String getMessage() { return message; }
+        public String getCode() {
+            return code;
+        }
+
+        public boolean isLiveEmailSent() {
+            return liveEmailSent;
+        }
+
+        public String getMessage() {
+            return message;
+        }
     }
 
     public OtpDispatchResult generateAndSendOtpDetails(String email) {
@@ -156,10 +175,12 @@ public class UserService {
     }
 
     public boolean verifyOtp(String email, String inputOtp, boolean consumeOnSuccess) {
-        if (email == null || inputOtp == null) return false;
+        if (email == null || inputOtp == null)
+            return false;
         String cleanEmail = email.trim().toLowerCase();
         OtpRecord record = otpStore.get(cleanEmail);
-        if (record == null) return false;
+        if (record == null)
+            return false;
         if (record.expiresAt.isBefore(LocalDateTime.now())) {
             otpStore.remove(cleanEmail);
             return false;
@@ -200,11 +221,13 @@ public class UserService {
     }
 
     public User updateProfile(String id, Map<String, Object> updateData) {
-        if ((id == null || id.trim().isEmpty()) && (!updateData.containsKey("email") || updateData.get("email") == null)) {
+        if ((id == null || id.trim().isEmpty())
+                && (!updateData.containsKey("email") || updateData.get("email") == null)) {
             throw new IllegalArgumentException("User ID or Email is required for update.");
         }
 
-        Optional<User> userOpt = (id != null && !id.trim().isEmpty()) ? userRepository.findById(id.trim()) : Optional.empty();
+        Optional<User> userOpt = (id != null && !id.trim().isEmpty()) ? userRepository.findById(id.trim())
+                : Optional.empty();
         if (!userOpt.isPresent() && updateData.containsKey("email")) {
             String em = (String) updateData.get("email");
             if (em != null) {
@@ -213,7 +236,8 @@ public class UserService {
         }
 
         if (!userOpt.isPresent()) {
-            throw new IllegalArgumentException("User not found with ID/Email: " + (id != null ? id : updateData.get("email")));
+            throw new IllegalArgumentException(
+                    "User not found with ID/Email: " + (id != null ? id : updateData.get("email")));
         }
 
         User user = userOpt.get();
@@ -237,6 +261,10 @@ public class UserService {
 
         if (updateData.containsKey("phone")) {
             user.setPhone((String) updateData.get("phone"));
+        }
+
+        if (updateData.containsKey("status") && updateData.get("status") != null) {
+            user.setStatus((String) updateData.get("status"));
         }
 
         if (updateData.containsKey("customAvatar")) {
@@ -276,7 +304,8 @@ public class UserService {
                 try {
                     com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                     patient.setEmergencyContactsJson(mapper.writeValueAsString(ec));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             return patientRepository.save(patient);
         } else if (user instanceof Pharmacist) {
@@ -290,14 +319,21 @@ public class UserService {
             if (updateData.containsKey("licenseNumber")) {
                 pharmacist.setLicenseNumber((String) updateData.get("licenseNumber"));
             }
+            if (updateData.containsKey("verificationStatus")) {
+                pharmacist.setVerificationStatus((String) updateData.get("verificationStatus"));
+            }
             return pharmacistRepository.save(pharmacist);
         } else if (user instanceof Admin) {
             Admin admin = (Admin) user;
             if (updateData.containsKey("accessLevel")) {
                 Object lvl = updateData.get("accessLevel");
-                if (lvl instanceof Number) admin.setAccessLevel(((Number) lvl).intValue());
+                if (lvl instanceof Number)
+                    admin.setAccessLevel(((Number) lvl).intValue());
                 else if (lvl instanceof String) {
-                    try { admin.setAccessLevel(Integer.parseInt((String) lvl)); } catch (Exception ignored) {}
+                    try {
+                        admin.setAccessLevel(Integer.parseInt((String) lvl));
+                    } catch (Exception ignored) {
+                    }
                 }
             }
             return adminRepository.save(admin);
@@ -319,10 +355,74 @@ public class UserService {
     }
 
     public boolean deleteUser(String id) {
-        if (id == null || id.trim().isEmpty()) return false;
-        Optional<User> userOpt = userRepository.findById(id.trim());
-        if (!userOpt.isPresent()) return false;
-        userRepository.deleteById(id.trim());
+        return deleteUser(id, null);
+    }
+
+    public boolean deleteUser(String id, String currentAdminId) {
+        if (id == null || id.trim().isEmpty())
+            return false;
+
+        String targetId = id.trim();
+        if (currentAdminId != null && targetId.equalsIgnoreCase(currentAdminId.trim())) {
+            throw new IllegalArgumentException("Administrators cannot delete their own active account.");
+        }
+
+        Optional<User> userOpt = userRepository.findById(targetId);
+        if (!userOpt.isPresent())
+            return false;
+
+        User user = userOpt.get();
+
+        // Referential integrity check: protect prescriptions & active reminders
+        boolean hasPrescriptions = false;
+        if (prescriptionRepository != null) {
+            try {
+                hasPrescriptions = !prescriptionRepository.findByPatientIdOrderByUploadedAtDesc(targetId).isEmpty();
+            } catch (Exception ignored) {}
+        }
+
+        boolean hasReminders = false;
+        if (reminderRepository != null) {
+            try {
+                hasReminders = !reminderRepository.findByPatientIdOrPatientEmailIgnoreCaseOrderByReminderTimeAsc(
+                        targetId, user.getEmail() != null ? user.getEmail() : "").isEmpty();
+            } catch (Exception ignored) {}
+        }
+
+        if (hasPrescriptions || hasReminders) {
+            // Soft-delete / safe deactivation prevents cascade deletion of medical records
+            user.setStatus("DEACTIVATED");
+            userRepository.save(user);
+            return true;
+        }
+
+        userRepository.deleteById(targetId);
         return true;
+    }
+
+    public User suspendUser(String id) {
+        if (id == null || id.trim().isEmpty()) throw new IllegalArgumentException("User ID is required.");
+        Optional<User> uOpt = userRepository.findById(id.trim());
+        if (!uOpt.isPresent()) throw new IllegalArgumentException("User not found with ID: " + id);
+        User u = uOpt.get();
+        u.setStatus("SUSPENDED");
+        return userRepository.save(u);
+    }
+
+    public User activateUser(String id) {
+        if (id == null || id.trim().isEmpty()) throw new IllegalArgumentException("User ID is required.");
+        Optional<User> uOpt = userRepository.findById(id.trim());
+        if (!uOpt.isPresent()) throw new IllegalArgumentException("User not found with ID: " + id);
+        User u = uOpt.get();
+        u.setStatus("ACTIVE");
+        return userRepository.save(u);
+    }
+
+    public void setPrescriptionRepository(PrescriptionRepository prescriptionRepository) {
+        this.prescriptionRepository = prescriptionRepository;
+    }
+
+    public void setReminderRepository(ReminderRepository reminderRepository) {
+        this.reminderRepository = reminderRepository;
     }
 }

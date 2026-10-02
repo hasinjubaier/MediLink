@@ -8,7 +8,8 @@ import java.util.Set;
 
 /**
  * Base Class for all users in the MediLink system.
- * Demonstrates Abstraction, Encapsulation, and Polymorphic JPA Inheritance (JOINED).
+ * Demonstrates Abstraction, Encapsulation, and Polymorphic JPA Inheritance
+ * (JOINED).
  */
 @Entity
 @Table(name = "users")
@@ -41,10 +42,14 @@ public class User {
     @Column(name = "custom_avatar", columnDefinition = "TEXT")
     protected String customAvatar;
 
+    @Column(name = "status", length = 30)
+    protected String status = "ACTIVE";
+
     @Column(name = "created_at")
     protected LocalDateTime createdAt;
 
     public User() {
+        this.status = "ACTIVE";
         this.createdAt = LocalDateTime.now();
     }
 
@@ -67,32 +72,85 @@ public class User {
         this.createdAt = LocalDateTime.now();
     }
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public String getId() {
+        return id;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public String getName() {
+        return name;
+    }
 
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public UserRole getRole() { return role; }
-    public void setRole(UserRole role) { this.role = role; }
+    public String getEmail() {
+        return email;
+    }
 
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-    public String getAvatarEmoji() { return avatarEmoji; }
-    public void setAvatarEmoji(String avatarEmoji) { this.avatarEmoji = avatarEmoji; }
+    public String getPasswordHash() {
+        return passwordHash;
+    }
 
-    public String getCustomAvatar() { return customAvatar; }
-    public void setCustomAvatar(String customAvatar) { this.customAvatar = customAvatar; }
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getAvatarEmoji() {
+        return avatarEmoji;
+    }
+
+    public void setAvatarEmoji(String avatarEmoji) {
+        this.avatarEmoji = avatarEmoji;
+    }
+
+    public String getCustomAvatar() {
+        return customAvatar;
+    }
+
+    public void setCustomAvatar(String customAvatar) {
+        this.customAvatar = customAvatar;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getStatus() {
+        return status != null ? status : "ACTIVE";
+    }
+
+    public void setStatus(String status) {
+        this.status = status != null ? status.toUpperCase().trim() : "ACTIVE";
+    }
 
     // Polymorphic method implementations
     public String getDashboardInfo() {
