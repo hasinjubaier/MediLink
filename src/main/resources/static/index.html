@@ -1458,6 +1458,16 @@
                         </span>
                         <span>Prescriptions & Meds</span>
                     </button>
+                    <button class="nav-btn" onclick="switchTab('pharmacies')" id="tab-btn-pharmacies">
+                        <span class="nav-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                                <circle cx="12" cy="10" r="3" />
+                            </svg>
+                        </span>
+                        <span>Pharmacy Locator</span>
+                    </button>
                     <button class="nav-btn" onclick="switchTab('reminders')" id="tab-btn-reminders">
                         <span class="nav-icon">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -2377,6 +2387,47 @@
                     </div>
 
                     <div class="emergency-pharmacies-grid" id="emergency-pharmacies-container"></div>
+                </section>
+
+                <!-- Tab: Nearby Pharmacy Locator (Static, Geolocation + OpenStreetMap) -->
+                <section id="tab-pharmacies" class="tab-view">
+                    <div class="section-header">
+                        <div>
+                            <h2 style="display:flex; align-items:center; gap:10px;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="color:var(--primary-blue, #1d4ed8);">
+                                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                                    <circle cx="12" cy="10" r="3" />
+                                </svg>
+                                <span>Nearby Pharmacy Locator</span>
+                            </h2>
+                            <p class="text-muted">Find trusted pharmacies across Dhaka, sorted by distance from your
+                                current location. Call directly or get turn-by-turn directions.</p>
+                        </div>
+                    </div>
+
+                    <div class="phloc-controls-card">
+                        <button class="btn btn-primary" id="phloc-use-location-btn" onclick="useMyPharmacyLocation()"
+                            style="display:inline-flex; align-items:center; gap:8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                                <circle cx="12" cy="10" r="3" />
+                            </svg>
+                            <span>Use My Location</span>
+                        </button>
+                        <span class="phloc-status" id="phloc-status">Tap "Use My Location" to sort pharmacies by
+                            distance from you.</span>
+                    </div>
+
+                    <div class="card phloc-map-card" id="phloc-map-card">
+                        <iframe id="phloc-map-frame" title="Pharmacy map - OpenStreetMap" loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            src="https://www.openstreetmap.org/export/embed.html?bbox=90.3370%2C23.7000%2C90.4730%2C23.9000&amp;layer=mapnik"></iframe>
+                    </div>
+
+                    <div class="phloc-grid" id="phloc-results-grid"></div>
                 </section>
 
                 <!-- Tab 5: Fake Medicine & Batch Verifier -->

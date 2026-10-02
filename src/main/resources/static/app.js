@@ -1546,6 +1546,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
 
     const chatNavLabel = document.getElementById('tab-btn-chat-label');
     const remTabBtn = document.getElementById('tab-btn-reminders');
+    const phlocTabBtn = document.getElementById('tab-btn-pharmacies');
 
     const topUploadBtn = document.querySelector('.btn-top-upload');
     const rxUploadNewBtn = document.getElementById('btn-upload-new-rx');
@@ -1558,6 +1559,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
         if (stockTabBtn) stockTabBtn.style.display = 'none';
         if (adminTabBtn) adminTabBtn.style.display = 'none';
         if (remTabBtn) remTabBtn.style.display = 'flex';
+        if (phlocTabBtn) phlocTabBtn.style.display = 'flex';
         if (chatNavLabel) chatNavLabel.textContent = 'Pharmacist Live Chat';
         if (topUploadBtn) topUploadBtn.style.display = 'inline-block';
         if (rxUploadNewBtn) rxUploadNewBtn.style.display = '';
@@ -1569,6 +1571,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
         if (stockTabBtn) stockTabBtn.style.display = 'flex';
         if (adminTabBtn) adminTabBtn.style.display = 'none';
         if (remTabBtn) remTabBtn.style.display = 'none';
+        if (phlocTabBtn) phlocTabBtn.style.display = 'none';
         if (chatNavLabel) chatNavLabel.textContent = 'Patient Live Chat';
         if (topUploadBtn) topUploadBtn.style.display = 'none';
         if (rxUploadNewBtn) rxUploadNewBtn.style.display = 'none';
@@ -1581,6 +1584,7 @@ function applyAuthenticatedUser(user, saveToStorage = true) {
         if (verifyTabBtn) verifyTabBtn.style.display = 'flex';
         if (adminTabBtn) adminTabBtn.style.display = 'flex';
         if (remTabBtn) remTabBtn.style.display = 'none';
+        if (phlocTabBtn) phlocTabBtn.style.display = 'none';
         if (chatNavLabel) chatNavLabel.textContent = 'Live Consultations';
         if (topUploadBtn) topUploadBtn.style.display = 'none';
         if (rxUploadNewBtn) rxUploadNewBtn.style.display = 'none';
@@ -2380,6 +2384,9 @@ function switchTab(tabId) {
     }
     if (tabId === 'admin') {
         loadAdminData();
+    }
+    if (tabId === 'pharmacies') {
+        initPharmacyLocator();
     }
 }
 
@@ -3365,6 +3372,151 @@ function renderEmergencyPharmacies(list) {
             </div>
         </div>
     `).join('');
+}
+
+// 4b. Nearby Pharmacy Locator (Static Client-Side Data, Geolocation + Haversine + OpenStreetMap)
+const DHAKA_PHARMACIES = [
+    { name: 'Lazz Pharma', area: 'Dhanmondi', address: 'House 15, Road 27, Dhanmondi, Dhaka', lat: 23.7465, lng: 90.3760, phone: '+8801711000001', open24h: true },
+    { name: 'Tamanna Pharmacy', area: 'Banani', address: 'Road 11, Block E, Banani, Dhaka', lat: 23.7937, lng: 90.4045, phone: '+8801711000002', open24h: true },
+    { name: 'UniMed UniHealth Pharmacy', area: 'Gulshan 2', address: 'House 51, Road 9, Gulshan 2, Dhaka', lat: 23.7925, lng: 90.4178, phone: '+8801711000003', open24h: false },
+    { name: 'Popular Diagnostic Pharmacy', area: 'Dhanmondi', address: 'House 11, Road 2, Dhanmondi, Dhaka', lat: 23.7447, lng: 90.3738, phone: '+8801711000004', open24h: true },
+    { name: 'Ibn Sina Pharmacy', area: 'Dhanmondi', address: 'House 48, Road 9/A, Dhanmondi, Dhaka', lat: 23.7430, lng: 90.3718, phone: '+8801711000005', open24h: false },
+    { name: 'Square Hospital Pharmacy', area: 'Panthapath', address: '18/F Bir Uttam Qazi Nuruzzaman Sarak, Dhaka', lat: 23.7522, lng: 90.3818, phone: '+8801711000006', open24h: true },
+    { name: 'United Hospital Pharmacy', area: 'Gulshan', address: 'Plot 15, Road 71, Gulshan, Dhaka', lat: 23.8065, lng: 90.4206, phone: '+8801711000007', open24h: true },
+    { name: 'Evercare Hospital Pharmacy', area: 'Bashundhara', address: 'Plot 81, Block E, Bashundhara R/A, Dhaka', lat: 23.8192, lng: 90.4329, phone: '+8801711000008', open24h: true },
+    { name: 'Labaid Pharmacy', area: 'Dhanmondi', address: 'House 6, Road 4, Dhanmondi, Dhaka', lat: 23.7449, lng: 90.3751, phone: '+8801711000009', open24h: false },
+    { name: 'Green Life Hospital Pharmacy', area: 'Green Road', address: '32 Green Road, Farmgate, Dhaka', lat: 23.7463, lng: 90.3837, phone: '+8801711000010', open24h: true },
+    { name: 'Anwer Khan Modern Hospital Pharmacy', area: 'Dhanmondi', address: 'House 17, Road 8, Dhanmondi, Dhaka', lat: 23.7506, lng: 90.3685, phone: '+8801711000011', open24h: false },
+    { name: 'BIRDEM Hospital Pharmacy', area: 'Shahbag', address: '122 Kazi Nazrul Islam Ave, Shahbag, Dhaka', lat: 23.7387, lng: 90.3964, phone: '+8801711000012', open24h: true },
+    { name: 'Dhaka Medical Pharmacy', area: 'Shahbag', address: 'Secretariat Road, Shahbag, Dhaka', lat: 23.7256, lng: 90.3969, phone: '+8801711000013', open24h: false },
+    { name: 'Islami Bank Hospital Pharmacy', area: 'Kakrail', address: '24/B VIP Road, Kakrail, Dhaka', lat: 23.7347, lng: 90.4086, phone: '+8801711000014', open24h: true },
+    { name: 'Aalok Healthcare Pharmacy', area: 'Mirpur 10', address: 'Plot 1/1, Block D, Mirpur 10, Dhaka', lat: 23.8071, lng: 90.3686, phone: '+8801711000015', open24h: false },
+    { name: 'Shahabuddin Medical Pharmacy', area: 'Gulshan 1', address: 'House 18, Road 113/A, Gulshan 1, Dhaka', lat: 23.7786, lng: 90.4162, phone: '+8801711000016', open24h: false },
+    { name: 'Arafa Pharmacy', area: 'Uttara', address: 'Sector 7, Road 12, Uttara, Dhaka', lat: 23.8728, lng: 90.3980, phone: '+8801711000017', open24h: true },
+    { name: 'Asgar Ali Hospital Pharmacy', area: 'Gandaria', address: '111/1 Distillery Road, Gandaria, Dhaka', lat: 23.7023, lng: 90.4215, phone: '+8801711000018', open24h: true },
+    { name: 'Medinova Pharmacy', area: 'Malibagh', address: '1 Paribagh, Malibagh, Dhaka', lat: 23.7454, lng: 90.4123, phone: '+8801711000019', open24h: false },
+    { name: 'City Hospital Pharmacy', area: 'Shantinagar', address: '4/1 Shantinagar, Dhaka', lat: 23.7374, lng: 90.4146, phone: '+8801711000020', open24h: false }
+];
+
+let pharmacyUserLocation = null;
+
+function haversineDistanceKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const toRad = deg => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2))
+        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function initPharmacyLocator() {
+    renderPharmacyList();
+}
+
+function useMyPharmacyLocation() {
+    const statusEl = document.getElementById('phloc-status');
+    const btn = document.getElementById('phloc-use-location-btn');
+
+    if (!navigator.geolocation) {
+        if (statusEl) statusEl.textContent = 'Geolocation is not supported by this browser.';
+        showToast('Geolocation is not supported by this browser.');
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (statusEl) statusEl.textContent = 'Detecting your location...';
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            pharmacyUserLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            if (btn) btn.disabled = false;
+            if (statusEl) {
+                statusEl.textContent = `Location detected (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}) — sorted nearest first.`;
+            }
+            renderPharmacyList();
+        },
+        err => {
+            if (btn) btn.disabled = false;
+            const msg = err && err.code === 1
+                ? 'Location permission denied. Enable location access to sort by distance.'
+                : 'Unable to detect your location. Please try again.';
+            if (statusEl) statusEl.textContent = msg;
+            showToast(msg);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+}
+
+function updatePharmacyMap(user, nearest) {
+    const frame = document.getElementById('phloc-map-frame');
+    if (!frame) return;
+
+    const pad = 0.008;
+    const west = Math.min(user.lng, nearest.lng) - pad;
+    const east = Math.max(user.lng, nearest.lng) + pad;
+    const south = Math.min(user.lat, nearest.lat) - pad;
+    const north = Math.max(user.lat, nearest.lat) + pad;
+
+    frame.src = `https://www.openstreetmap.org/export/embed.html?bbox=${west.toFixed(6)}%2C${south.toFixed(6)}%2C${east.toFixed(6)}%2C${north.toFixed(6)}&layer=mapnik&marker=${nearest.lat}%2C${nearest.lng}`;
+}
+
+function renderPharmacyList() {
+    const grid = document.getElementById('phloc-results-grid');
+    if (!grid) return;
+
+    let list = DHAKA_PHARMACIES.map(p => ({
+        ...p,
+        distance: pharmacyUserLocation
+            ? haversineDistanceKm(pharmacyUserLocation.lat, pharmacyUserLocation.lng, p.lat, p.lng)
+            : null
+    }));
+
+    if (pharmacyUserLocation) {
+        list.sort((a, b) => a.distance - b.distance);
+        updatePharmacyMap(pharmacyUserLocation, list[0]);
+    } else {
+        list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    grid.innerHTML = list.map((p, idx) => {
+        const isNearest = pharmacyUserLocation && idx === 0;
+        const distanceBadge = p.distance !== null
+            ? `<span class="status-pill ${isNearest ? 'status-verified' : 'status-uploaded'}" style="font-size:0.7rem;">${p.distance.toFixed(1)} km away</span>`
+            : '';
+        const nearestBadge = isNearest
+            ? `<span class="status-pill status-verified" style="font-size:0.7rem;">Nearest</span>`
+            : '';
+        return `
+        <div class="phloc-card ${p.open24h ? 'is-24h' : ''} ${isNearest ? 'is-nearest' : ''}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                <div>
+                    <h3 style="font-size:1.1rem; font-weight:800;">${escapeHtml(p.name)}</h3>
+                    <p class="text-muted">${escapeHtml(p.address)}</p>
+                </div>
+                ${distanceBadge}
+            </div>
+            <div style="margin:12px 0; display:flex; flex-wrap:wrap; gap:8px;">
+                ${nearestBadge}
+                <span class="status-pill ${p.open24h ? 'status-uploaded' : 'status-extracted'}" style="display:inline-flex; align-items:center; gap:5px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>${p.open24h ? 'Open 24 Hours' : 'Regular Hours'}</span>
+                </span>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <a href="tel:${p.phone}" class="btn btn-primary" style="flex:1; text-align:center; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span>Call</span>
+                </a>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener" class="btn btn-secondary" style="flex:1; text-align:center; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                    <span>Directions</span>
+                </a>
+            </div>
+        </div>
+    `;
+    }).join('');
 }
 
 // 5. Fake Medicine & QR Batch Verifier
